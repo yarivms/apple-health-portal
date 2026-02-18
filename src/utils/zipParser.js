@@ -14,41 +14,53 @@ export async function parseAppleHealthZip(file) {
       metadata: {}
     };
 
-    // Parse export.xml (main health data)
+    // Parse export.xml (main health data) - store as string to avoid parser memory issues
     if (loadedZip.file('apple_health_export/export.xml')) {
       const xmlText = await loadedZip.file('apple_health_export/export.xml').async('text');
-      health.mainData = parseXML(xmlText);
+      health.mainData = xmlText; // Store raw XML string
     }
 
     // Parse export_cda.xml (clinical format)
     if (loadedZip.file('apple_health_export/export_cda.xml')) {
       const xmlText = await loadedZip.file('apple_health_export/export_cda.xml').async('text');
-      health.clinicalData = parseXML(xmlText);
+      health.clinicalData = xmlText; // Store raw XML string
     }
 
     // Extract ECG files
+    const ecgPromises = [];
     loadedZip.folder('apple_health_export/electrocardiograms')?.forEach((relativePath, file) => {
       if (relativePath.endsWith('.xml')) {
-        file.async('text').then(xmlText => {
-          health.ecgs.push({
-            filename: relativePath,
-            data: parseXML(xmlText)
-          });
-        });
+        ecgPromises.push(
+          file.async('text').then(xmlText => {
+            const doc = parseXML(xmlText);
+            if (doc) {
+              health.ecgs.push({
+                filename: relativePath,
+                data: doc
+              });
+            }
+          })
+        );
       }
     });
 
     // Extract workout route files
+    const routePromises = [];
     loadedZip.folder('apple_health_export/workout-routes')?.forEach((relativePath, file) => {
       if (relativePath.endsWith('.gpx') || relativePath.endsWith('.xml')) {
-        file.async('text').then(data => {
-          health.workoutRoutes.push({
-            filename: relativePath,
-            data: data
-          });
-        });
+        routePromises.push(
+          file.async('text').then(data => {
+            health.workoutRoutes.push({
+              filename: relativePath,
+              data: data
+            });
+          })
+        );
       }
     });
+
+    // Wait for all async operations
+    await Promise.all([...ecgPromises, ...routePromises]);
 
     return health;
   } catch (error) {
@@ -73,51 +85,55 @@ function parseXML(xmlString) {
   }
 }
 
-export function extractHealthRecords(xmlDoc) {
-  if (!xmlDoc) return [];
+export function extractHealthRecords(xmlString) {
+  if (!xmlString || typeof xmlString !== 'string') return [];
   
   const records = [];
-  const elements = xmlDoc.querySelectorAll('Record, HKQuantityTypeRecord, HKCategoryTypeRecord, HKWorkoutTypeRecord');
   
-  elements.forEach(el => {
-    const record = {
-      type: el.getAttribute('type') || el.tagName,
-      startDate: el.getAttribute('startDate') || el.getAttribute('creationDate'),
-      endDate: el.getAttribute('endDate'),
-      value: el.getAttribute('value'),
-      unit: el.getAttribute('unit'),
-      sourceName: el.getAttribute('sourceName'),
-      sourceVersion: el.getAttribute('sourceVersion')
-    };
+  // Parse records using regex to avoid DOMParser memory issues with large files
+  const recordRegex = /<Record[^>]*?type="([^"]*)"[^>]*?startDate="([^"]*)"[^>]*?(?:endDate="([^"]*)")?[^>]*?(?:value="([^"]*)")?[^>]*?(?:unit="([^"]*)")?[^>]*?(?:sourceName="([^"]*)")?[^>]*?(?:sourceVersion="([^"]*)")?[^>]*/g;
+  
+  let match;
+  while ((match = recordRegex.exec(xmlString)) !== null) {
+    records.push({
+      type: match[1],
+      startDate: match[2],
+      endDate: match[3],
+      value: match[4],
+      unit: match[5],
+      sourceName: match[6],
+      sourceVersion: match[7]
+    });
     
-    if (record.startDate) {
-      records.push(record);
-    }
-  });
+    // Limit to prevent memory overload
+    if (records.length > 50000) break;
+  }
   
   return records;
 }
 
-export function extractWorkouts(xmlDoc) {
-  if (!xmlDoc) return [];
+export function extractWorkouts(xmlString) {
+  if (!xmlString || typeof xmlString !== 'string') return [];
   
   const workouts = [];
-  const elements = xmlDoc.querySelectorAll('Workout, HKWorkoutTypeRecord');
   
-  elements.forEach(el => {
-    const workout = {
-      workoutActivityType: el.getAttribute('workoutActivityType'),
-      startDate: el.getAttribute('startDate'),
-      endDate: el.getAttribute('endDate'),
-      duration: el.getAttribute('duration'),
-      durationUnit: el.getAttribute('durationUnit'),
-      totalEnergyBurned: el.getAttribute('totalEnergyBurned'),
-      totalEnergyBurnedUnit: el.getAttribute('totalEnergyBurnedUnit'),
-      totalDistance: el.getAttribute('totalDistance'),
-      totalDistanceUnit: el.getAttribute('totalDistanceUnit')
-    };
-    workouts.push(workout);
-  });
+  // Parse workouts using regex
+  const workoutRegex = /<Workout[^>]*?workoutActivityType="([^"]*)"[^>]*?startDate="([^"]*)"[^>]*?(?:endDate="([^"]*)")?[^>]*?(?:duration="([^"]*)")?[^>]*?(?:durationUnit="([^"]*)")?[^>]*?(?:totalEnergyBurned="([^"]*)")?[^>]*?(?:totalEnergyBurnedUnit="([^"]*)")?[^>]*?(?:totalDistance="([^"]*)")?[^>]*?(?:totalDistanceUnit="([^"]*)")?[^>]*/g;
+  
+  let match;
+  while ((match = workoutRegex.exec(xmlString)) !== null) {
+    workouts.push({
+      workoutActivityType: match[1],
+      startDate: match[2],
+      endDate: match[3],
+      duration: match[4],
+      durationUnit: match[5],
+      totalEnergyBurned: match[6],
+      totalEnergyBurnedUnit: match[7],
+      totalDistance: match[8],
+      totalDistanceUnit: match[9]
+    });
+  }
   
   return workouts;
 }
