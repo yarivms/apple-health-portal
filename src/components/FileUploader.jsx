@@ -66,7 +66,7 @@ export default function FileUploader({ onDataLoaded }) {
         <label htmlFor="file-input" className="upload-label">
           <Upload size={48} />
           <h3>Upload Apple Health Export</h3>
-          <p>Select your health_export.zip file from your iPhone</p>
+          <p>Select the ZIP file you exported from your iPhone Health app</p>
           <input
             id="file-input"
             type="file"

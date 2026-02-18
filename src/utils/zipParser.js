@@ -4,60 +4,79 @@ import JSZip from 'jszip';
 export async function parseAppleHealthZip(file) {
   try {
     const zip = new JSZip();
-    const loadedZip = await zip.loadAsync(file);
+    let loadedZip = await zip.loadAsync(file);
+    
+    // Check if this is a double-zipped file (contains another .zip inside)
+    const innerZipFile = Object.keys(loadedZip.files).find(name => name.endsWith('.zip'));
+    if (innerZipFile) {
+      const innerZipData = await loadedZip.file(innerZipFile).async('blob');
+      loadedZip = await new JSZip().loadAsync(innerZipData);
+    }
+    
+    // Find the export folder (could be named differently)
+    let exportFolder = 'apple_health_export/';
+    const files = Object.keys(loadedZip.files);
+    
+    // Check for various possible folder names
+    const possibleFolders = files.filter(f => f.includes('export') || f.includes('health'));
+    if (possibleFolders.length > 0) {
+      const folderName = possibleFolders[0].split('/')[0];
+      exportFolder = folderName + '/';
+    }
     
     const health = {
       mainData: null,
       clinicalData: null,
       ecgs: [],
       workoutRoutes: [],
-      metadata: {}
+      metadata: {},
+      exportFolder: exportFolder
     };
 
-    // Parse export.xml (main health data) - store as string to avoid parser memory issues
-    if (loadedZip.file('apple_health_export/export.xml')) {
-      const xmlText = await loadedZip.file('apple_health_export/export.xml').async('text');
-      health.mainData = xmlText; // Store raw XML string
+    // Find and parse export.xml (main health data)
+    const exportXmlFile = files.find(f => f.endsWith('export.xml') && !f.includes('cda'));
+    if (exportXmlFile) {
+      const xmlText = await loadedZip.file(exportXmlFile).async('text');
+      health.mainData = xmlText;
     }
 
-    // Parse export_cda.xml (clinical format)
-    if (loadedZip.file('apple_health_export/export_cda.xml')) {
-      const xmlText = await loadedZip.file('apple_health_export/export_cda.xml').async('text');
-      health.clinicalData = xmlText; // Store raw XML string
+    // Find and parse export_cda.xml (clinical format)
+    const cdaXmlFile = files.find(f => f.includes('cda') && f.endsWith('.xml'));
+    if (cdaXmlFile) {
+      const xmlText = await loadedZip.file(cdaXmlFile).async('text');
+      health.clinicalData = xmlText;
     }
 
     // Extract ECG files
     const ecgPromises = [];
-    loadedZip.folder('apple_health_export/electrocardiograms')?.forEach((relativePath, file) => {
-      if (relativePath.endsWith('.xml')) {
-        ecgPromises.push(
-          file.async('text').then(xmlText => {
-            const doc = parseXML(xmlText);
-            if (doc) {
-              health.ecgs.push({
-                filename: relativePath,
-                data: doc
-              });
-            }
-          })
-        );
-      }
-    });
+    const ecgFiles = files.filter(f => f.includes('electro') && f.endsWith('.xml'));
+    for (const ecgFile of ecgFiles) {
+      ecgPromises.push(
+        loadedZip.file(ecgFile).async('text').then(xmlText => {
+          const doc = parseXML(xmlText);
+          if (doc) {
+            health.ecgs.push({
+              filename: ecgFile.split('/').pop(),
+              data: doc
+            });
+          }
+        }).catch(err => console.warn('Failed to parse ECG:', err))
+      );
+    }
 
     // Extract workout route files
     const routePromises = [];
-    loadedZip.folder('apple_health_export/workout-routes')?.forEach((relativePath, file) => {
-      if (relativePath.endsWith('.gpx') || relativePath.endsWith('.xml')) {
-        routePromises.push(
-          file.async('text').then(data => {
-            health.workoutRoutes.push({
-              filename: relativePath,
-              data: data
-            });
-          })
-        );
-      }
-    });
+    const routeFiles = files.filter(f => (f.includes('workout') || f.includes('route')) && (f.endsWith('.gpx') || f.endsWith('.xml')));
+    for (const routeFile of routeFiles) {
+      routePromises.push(
+        loadedZip.file(routeFile).async('text').then(data => {
+          health.workoutRoutes.push({
+            filename: routeFile.split('/').pop(),
+            data: data
+          });
+        }).catch(err => console.warn('Failed to parse route:', err))
+      );
+    }
 
     // Wait for all async operations
     await Promise.all([...ecgPromises, ...routePromises]);
