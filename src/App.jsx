@@ -384,25 +384,10 @@ function App() {
       <main className="app-main">
         {!healthData ? (
           <div className="upload-section">
-            <div
-              className="upload-area"
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Upload size={48} className="upload-icon" />
-              <h2>Upload Apple Health Export</h2>
-              <p>Drag and drop your export.xml file or click to browse</p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".xml"
-                onChange={handleFileUpload}
-                style={{ display: 'none' }}
-              />
-              <button className="upload-button">Select File</button>
-            </div>
+            <FileUploader onDataLoaded={(data) => {
+              setImportedHealthData(data);
+              setActiveTab('import');
+            }} />
 
             {error && (
               <div className="error-message">
