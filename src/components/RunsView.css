@@ -1,0 +1,387 @@
+.runs-view {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+  margin-bottom: 2rem;
+}
+
+.runs-header {
+  margin-bottom: 2rem;
+}
+
+.runs-header h2 {
+  font-size: 2rem;
+  color: #1f2937;
+  margin: 0;
+  font-weight: 700;
+}
+
+.runs-subtitle {
+  color: #6b7280;
+  font-size: 0.95rem;
+  margin: 0.5rem 0 0 0;
+}
+
+/* Stats Summary */
+.runs-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, #f0f4ff 0%, #f5e6ff 100%);
+  border-radius: 8px;
+  padding: 1.5rem;
+  border-left: 4px solid #8b5cf6;
+  display: flex;
+  gap: 1rem;
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(139, 92, 246, 0.2);
+}
+
+.stat-card svg {
+  width: 24px;
+  height: 24px;
+  color: #8b5cf6;
+  flex-shrink: 0;
+}
+
+.stat-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+/* Controls */
+.runs-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.runs-controls label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.runs-controls select {
+  padding: 0.625rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  color: #1f2937;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.runs-controls select:hover {
+  border-color: #9ca3af;
+}
+
+.runs-controls select:focus {
+  outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+/* Runs List */
+.runs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.run-item {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.run-item:hover {
+  border-color: #8b5cf6;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.run-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+}
+
+.run-title {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+}
+
+.run-title svg {
+  color: #8b5cf6;
+  flex-shrink: 0;
+}
+
+.run-date {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.date-main {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.date-time {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.run-summary {
+  display: flex;
+  gap: 1.5rem;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.summary-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #374151;
+  font-weight: 500;
+}
+
+.summary-item svg {
+  color: #8b5cf6;
+}
+
+.run-expand {
+  color: #9ca3af;
+  transition: color 0.3s ease;
+  flex-shrink: 0;
+}
+
+.run-item:hover .run-expand {
+  color: #8b5cf6;
+}
+
+/* Run Details */
+.run-details {
+  padding: 2rem;
+  background: #fafbfc;
+  border-top: 1px solid #e5e7eb;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.detail-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: white;
+  border-radius: 8px;
+  border-left: 3px solid #8b5cf6;
+  transition: all 0.2s ease;
+}
+
+.detail-item:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+}
+
+.detail-item svg {
+  color: #8b5cf6;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+}
+
+.detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.detail-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+/* Map Placeholder */
+.run-map-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 2rem;
+  background: linear-gradient(135deg, #f0f4ff 0%, #f5e6ff 100%);
+  border-radius: 8px;
+  border: 2px dashed #d1d5db;
+  color: #9ca3af;
+  min-height: 200px;
+}
+
+.run-map-placeholder svg {
+  width: 48px;
+  height: 48px;
+  color: #c4b5fd;
+}
+
+.run-map-placeholder p {
+  font-size: 0.95rem;
+  margin: 0;
+  font-weight: 500;
+}
+
+/* No Workouts */
+.no-workouts {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #9ca3af;
+}
+
+.no-workouts p {
+  font-size: 1rem;
+  margin: 0;
+}
+
+@media (max-width: 1024px) {
+  .run-summary {
+    gap: 1rem;
+    font-size: 0.85rem;
+  }
+
+  .details-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+  }
+
+  .detail-item {
+    padding: 1rem;
+  }
+
+  .detail-value {
+    font-size: 1.1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .runs-view {
+    padding: 1rem;
+  }
+
+  .runs-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .runs-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+
+  .stat-card {
+    padding: 1rem;
+  }
+
+  .stat-value {
+    font-size: 1.25rem;
+  }
+
+  .run-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .run-title {
+    width: 100%;
+  }
+
+  .run-summary {
+    width: 100%;
+    justify-content: space-between;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .summary-item {
+    font-size: 0.8rem;
+    width: 100%;
+  }
+
+  .run-expand {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+  }
+
+  .run-details {
+    padding: 1rem;
+  }
+
+  .details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-item {
+    padding: 1rem;
+  }
+
+  .run-map-placeholder {
+    min-height: 150px;
+    padding: 1.5rem;
+  }
+}

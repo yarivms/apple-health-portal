@@ -1,0 +1,141 @@
+.sleep-tracking {
+  background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  margin-bottom: 24px;
+}
+
+.sleep-tracking.no-data {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  color: #9ca3af;
+  text-align: center;
+  gap: 12px;
+}
+
+.sleep-tracking.no-data h3 {
+  color: #d1d5db;
+  margin: 8px 0 0 0;
+  font-size: 18px;
+}
+
+.sleep-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  color: #60a5fa;
+}
+
+.sleep-header h3 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #f0f9ff;
+}
+
+.sleep-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.sleep-stat-card {
+  background: rgba(96, 165, 250, 0.08);
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.3s ease;
+  cursor: default;
+}
+
+.sleep-stat-card:hover {
+  background: rgba(96, 165, 250, 0.12);
+  border-color: rgba(96, 165, 250, 0.4);
+  transform: translateY(-2px);
+}
+
+.sleep-stat-card svg {
+  width: 24px;
+  height: 24px;
+  color: #60a5fa;
+  flex-shrink: 0;
+}
+
+.stat-info {
+  flex: 1;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #f0f9ff;
+}
+
+.stat-unit {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.sleep-chart {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(96, 165, 250, 0.1);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.sleep-chart h4 {
+  margin: 0 0 16px 0;
+  color: #f0f9ff;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.sleep-chart svg {
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
+}
+
+@media (max-width: 640px) {
+  .sleep-tracking {
+    padding: 16px;
+  }
+
+  .sleep-stats {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+
+  .sleep-stat-card {
+    padding: 12px;
+    font-size: 13px;
+  }
+
+  .stat-value {
+    font-size: 18px;
+  }
+
+  .sleep-chart {
+    padding: 16px;
+  }
+
+  .sleep-chart h4 {
+    font-size: 14px;
+  }
+}

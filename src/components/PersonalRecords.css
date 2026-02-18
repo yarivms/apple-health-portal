@@ -1,0 +1,105 @@
+.personal-records {
+  background: linear-gradient(135deg, #fef3c7 0%, #fcd34d 100%);
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+}
+
+.pr-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.pr-header h3 {
+  font-size: 1.5rem;
+  color: #92400e;
+  margin: 0;
+  font-weight: 700;
+}
+
+.pr-header svg {
+  color: #d97706;
+}
+
+.pr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1.5rem;
+}
+
+.pr-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.pr-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+}
+
+.pr-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.pr-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pr-label {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pr-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+@media (max-width: 768px) {
+  .personal-records {
+    padding: 1.5rem;
+  }
+
+  .pr-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+
+  .pr-card {
+    padding: 1rem;
+  }
+
+  .pr-icon {
+    width: 56px;
+    height: 56px;
+  }
+
+  .pr-header h3 {
+    font-size: 1.25rem;
+  }
+
+  .pr-value {
+    font-size: 1.25rem;
+  }
+}

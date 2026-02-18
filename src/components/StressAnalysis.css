@@ -1,0 +1,258 @@
+.stress-analysis {
+  background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  margin-bottom: 24px;
+}
+
+.stress-analysis.no-data {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  color: #9ca3af;
+  text-align: center;
+  gap: 12px;
+}
+
+.stress-analysis.no-data h3 {
+  color: #d1d5db;
+  margin: 8px 0 0 0;
+  font-size: 18px;
+}
+
+.stress-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.stress-header h3 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #f0f9ff;
+}
+
+.stress-badge {
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  transition: all 0.3s ease;
+}
+
+.stress-indicator {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.stress-info {
+  flex: 1;
+}
+
+.stress-label {
+  font-size: 12px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.stress-value {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.stress-bar {
+  width: 120px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.stress-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.vital-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.vital-card {
+  background: rgba(96, 165, 250, 0.08);
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.3s ease;
+}
+
+.vital-card:hover {
+  background: rgba(96, 165, 250, 0.12);
+  border-color: rgba(96, 165, 250, 0.4);
+  transform: translateY(-2px);
+}
+
+.vital-card svg {
+  width: 20px;
+  height: 20px;
+  color: #60a5fa;
+  flex-shrink: 0;
+}
+
+.vital-info {
+  flex: 1;
+}
+
+.vital-label {
+  font-size: 11px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.vital-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f0f9ff;
+}
+
+.vital-unit {
+  font-size: 10px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.metric-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 4px;
+  border-radius: 8px;
+  width: fit-content;
+}
+
+.toggle-btn {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.toggle-btn:hover {
+  color: #d1d5db;
+}
+
+.toggle-btn.active {
+  background: rgba(96, 165, 250, 0.2);
+  color: #60a5fa;
+}
+
+.stress-chart {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(96, 165, 250, 0.1);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.wellness-tips {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.wellness-tips h4 {
+  margin: 0 0 16px 0;
+  color: #10b981;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.tip {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tip:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.tip span {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.tip p {
+  margin: 0;
+  color: #d1d5db;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .stress-analysis {
+    padding: 16px;
+  }
+
+  .stress-badge {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px;
+  }
+
+  .vital-stats {
+    grid-template-columns: 1fr;
+    margin-bottom: 20px;
+  }
+
+  .wellness-tips {
+    padding: 16px;
+  }
+
+  .tip {
+    gap: 10px;
+  }
+
+  .tip p {
+    font-size: 13px;
+  }
+}
