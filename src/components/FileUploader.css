@@ -1,0 +1,96 @@
+.file-uploader {
+  padding: 20px;
+  margin-bottom: 30px;
+}
+
+.upload-box {
+  border: 2px dashed #3b82f6;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(59, 130, 246, 0.02));
+  transition: all 0.3s ease;
+}
+
+.upload-box:hover {
+  border-color: #2563eb;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.05));
+}
+
+.upload-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  color: #1f2937;
+}
+
+.upload-label h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.upload-label p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.upload-label svg {
+  color: #3b82f6;
+  transition: transform 0.2s;
+}
+
+.upload-label:hover svg {
+  transform: scale(1.1);
+}
+
+.file-input {
+  display: none;
+}
+
+.status-message {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.status-message.loading {
+  background: #dbeafe;
+  color: #0c4a6e;
+  border: 1px solid #93c5fd;
+}
+
+.status-message.error {
+  background: #fee2e2;
+  color: #7f1d1d;
+  border: 1px solid #fca5a5;
+}
+
+.status-message.success {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-top-color: currentColor;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

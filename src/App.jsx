@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, Heart, Zap, Activity, TrendingUp, Calendar, Sparkles } from 'lucide-react';
+import { Upload, Heart, Zap, Activity, TrendingUp, Calendar, Sparkles, Navigation } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import MetricsCards from './components/MetricsCards';
 import ChartsSection from './components/ChartsSection';
@@ -10,6 +10,9 @@ import InsightsAI from './components/InsightsAI';
 import PersonalRecords from './components/PersonalRecords';
 import SleepTracking from './components/SleepTracking';
 import StressAnalysis from './components/StressAnalysis';
+import FileUploader from './components/FileUploader';
+import ECGViewer from './components/ECGViewer';
+import WorkoutRoutes from './components/WorkoutRoutes';
 import './App.css';
 
 // Advanced parser with proper aggregation and statistics
@@ -303,6 +306,7 @@ function App() {
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState('');
   const [activeTab, setActiveTab] = useState('metrics');
+  const [importedHealthData, setImportedHealthData] = useState(null);
   const fileInputRef = useRef(null);
 
   const handleFileUpload = async (event) => {
@@ -492,6 +496,13 @@ function App() {
                   <Sparkles size={18} />
                   Analytics & AI
                 </button>
+                <button
+                  className={`tab-button ${activeTab === 'import' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('import')}
+                >
+                  <Upload size={18} />
+                  Import Apple Health
+                </button>
               </div>
             )}
 
@@ -530,6 +541,40 @@ function App() {
                     <div style={{ marginTop: '24px' }}>
                       <StressAnalysis metricsByType={healthData.metricsByType} allDates={healthData.allDates} />
                     </div>
+                  </div>
+                )}
+                {activeTab === 'import' && (
+                  <div className="import-section">
+                    <FileUploader onDataLoaded={setImportedHealthData} />
+                    {importedHealthData && (
+                      <>
+                        <div className="import-summary">
+                          <h3>Imported Data Summary</h3>
+                          <div className="summary-stats">
+                            <div className="summary-stat">
+                              <span>Records:</span>
+                              <strong>{importedHealthData.totalRecords}</strong>
+                            </div>
+                            <div className="summary-stat">
+                              <span>Workouts:</span>
+                              <strong>{importedHealthData.totalWorkouts}</strong>
+                            </div>
+                            <div className="summary-stat">
+                              <span>ECGs:</span>
+                              <strong>{importedHealthData.totalECGs}</strong>
+                            </div>
+                          </div>
+                        </div>
+                        {importedHealthData.ecgs && importedHealthData.ecgs.length > 0 && (
+                          <ECGViewer ecgData={importedHealthData.ecgs} />
+                        )}
+                        {importedHealthData.workouts && importedHealthData.workouts.length > 0 && (
+                          <WorkoutRoutes workouts={importedHealthData.workouts} routes={importedHealthData.routes || []} />
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
                   </div>
                 )}
               </>
