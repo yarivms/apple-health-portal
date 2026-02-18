@@ -8,6 +8,7 @@ export default function FileUploader({ onDataLoaded }) {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [progress, setProgress] = useState('');
+  const [uploadedData, setUploadedData] = useState(null);
 
   const handleFileUpload = async (event) => {
     const file = event.target.files?.[0];
@@ -46,12 +47,16 @@ export default function FileUploader({ onDataLoaded }) {
         workouts,
         ecgs,
         fileSize: file.size,
-        uploadDate: new Date().toISOString()
+        uploadDate: new Date().toISOString(),
+        isSample: healthData.metadata?.truncated || false,
+        originalFileSize: healthData.metadata?.originalSize
       };
 
       onDataLoaded?.(aggregatedData);
+      setUploadedData(aggregatedData);
       setSuccess(true);
-      setProgress(`Successfully loaded ${aggregatedData.totalRecords} records, ${aggregatedData.totalWorkouts} workouts, ${aggregatedData.totalECGs} ECGs`);
+      const sampleNote = aggregatedData.isSample ? ' (showing sample from large file)' : '';
+      setProgress(`Successfully loaded ${aggregatedData.totalRecords} records, ${aggregatedData.totalWorkouts} workouts, ${aggregatedData.totalECGs} ECGs${sampleNote}`);
     } catch (err) {
       setError(err.message || 'Failed to parse file');
       console.error(err);
@@ -95,7 +100,14 @@ export default function FileUploader({ onDataLoaded }) {
       {success && (
         <div className="status-message success">
           <CheckCircle size={20} />
-          <p>{progress}</p>
+          <div>
+            <p>{progress}</p>
+            {uploadedData?.isSample && (
+              <p style={{ fontSize: '12px', marginTop: '4px', opacity: 0.8 }}>
+                Note: Due to file size, showing a representative sample of your data
+              </p>
+            )}
+          </div>
         </div>
       )}
     </div>

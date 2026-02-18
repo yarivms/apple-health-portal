@@ -36,8 +36,21 @@ export async function parseAppleHealthZip(file) {
     // Find and parse export.xml (main health data)
     const exportXmlFile = files.find(f => f.endsWith('export.xml') && !f.includes('cda'));
     if (exportXmlFile) {
-      const xmlText = await loadedZip.file(exportXmlFile).async('text');
-      health.mainData = xmlText;
+      // For large files, only read a portion to extract sample data
+      const fileSize = loadedZip.file(exportXmlFile)._data.uncompressedSize;
+      if (fileSize > 10 * 1024 * 1024) { // If larger than 10MB
+        // Read file as array buffer and convert to string in chunks
+        const arrayBuffer = await loadedZip.file(exportXmlFile).async('arraybuffer');
+        const decoder = new TextDecoder();
+        // Only decode first 5MB for sampling
+        const sample = decoder.decode(arrayBuffer.slice(0, 5 * 1024 * 1024));
+        health.mainData = sample;
+        health.metadata.truncated = true;
+        health.metadata.originalSize = fileSize;
+      } else {
+        const xmlText = await loadedZip.file(exportXmlFile).async('text');
+        health.mainData = xmlText;
+      }
     }
 
     // Find and parse export_cda.xml (clinical format)
