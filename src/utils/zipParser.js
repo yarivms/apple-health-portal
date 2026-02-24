@@ -5,10 +5,29 @@ export async function parseAppleHealthZip(file) {
   try {
     const zip = new JSZip();
     let loadedZip = await zip.loadAsync(file);
+
+    const MAX_INNER_ZIP_SIZE = 250 * 1024 * 1024; // 250MB
+    const MAX_EXPORT_XML_SIZE = 10 * 1024 * 1024; // 10MB
+    const MAX_CDA_XML_SIZE = 5 * 1024 * 1024; // 5MB
+    const MAX_ECG_XML_SIZE = 2 * 1024 * 1024; // 2MB
+    const MAX_ROUTE_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+
+    const getFileSize = (zipRef, path) => {
+      try {
+        const zipFile = zipRef.file(path);
+        return zipFile?._data?.uncompressedSize ?? null;
+      } catch {
+        return null;
+      }
+    };
     
     // Check if this is a double-zipped file (contains another .zip inside)
     const innerZipFile = Object.keys(loadedZip.files).find(name => name.endsWith('.zip'));
     if (innerZipFile) {
+      const innerSize = getFileSize(loadedZip, innerZipFile);
+      if (innerSize && innerSize > MAX_INNER_ZIP_SIZE) {
+        throw new Error('Export ZIP is too large to process in the browser. Please use a smaller export.');
+      }
       const innerZipData = await loadedZip.file(innerZipFile).async('blob');
       loadedZip = await new JSZip().loadAsync(innerZipData);
     }
@@ -36,11 +55,11 @@ export async function parseAppleHealthZip(file) {
     // Find and parse export.xml (main health data)
     const exportXmlFile = files.find(f => f.endsWith('export.xml') && !f.includes('cda'));
     if (exportXmlFile) {
-      const fileSize = loadedZip.file(exportXmlFile)._data.uncompressedSize;
+      const fileSize = getFileSize(loadedZip, exportXmlFile);
       health.metadata.originalSize = fileSize;
 
       // Avoid loading very large XML files in the browser (can throw Invalid string length)
-      if (fileSize > 10 * 1024 * 1024) {
+      if (fileSize && fileSize > MAX_EXPORT_XML_SIZE) {
         health.metadata.tooLarge = true;
       } else {
         const xmlText = await loadedZip.file(exportXmlFile).async('text');
@@ -51,8 +70,8 @@ export async function parseAppleHealthZip(file) {
     // Find and parse export_cda.xml (clinical format)
     const cdaXmlFile = files.find(f => f.includes('cda') && f.endsWith('.xml'));
     if (cdaXmlFile) {
-      const cdaSize = loadedZip.file(cdaXmlFile)._data.uncompressedSize;
-      if (cdaSize <= 5 * 1024 * 1024) {
+      const cdaSize = getFileSize(loadedZip, cdaXmlFile);
+      if (cdaSize && cdaSize <= MAX_CDA_XML_SIZE) {
         const xmlText = await loadedZip.file(cdaXmlFile).async('text');
         health.clinicalData = xmlText;
       } else {
@@ -64,6 +83,10 @@ export async function parseAppleHealthZip(file) {
     const ecgPromises = [];
     const ecgFiles = files.filter(f => f.includes('electro') && f.endsWith('.xml'));
     for (const ecgFile of ecgFiles) {
+      const ecgSize = getFileSize(loadedZip, ecgFile);
+      if (ecgSize && ecgSize > MAX_ECG_XML_SIZE) {
+        continue;
+      }
       ecgPromises.push(
         loadedZip.file(ecgFile).async('text').then(xmlText => {
           const doc = parseXML(xmlText);
@@ -81,6 +104,10 @@ export async function parseAppleHealthZip(file) {
     const routePromises = [];
     const routeFiles = files.filter(f => (f.includes('workout') || f.includes('route')) && (f.endsWith('.gpx') || f.endsWith('.xml')));
     for (const routeFile of routeFiles) {
+      const routeSize = getFileSize(loadedZip, routeFile);
+      if (routeSize && routeSize > MAX_ROUTE_FILE_SIZE) {
+        continue;
+      }
       routePromises.push(
         loadedZip.file(routeFile).async('text').then(data => {
           health.workoutRoutes.push({
