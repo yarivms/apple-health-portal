@@ -48,15 +48,18 @@ export default function FileUploader({ onDataLoaded }) {
         ecgs,
         fileSize: file.size,
         uploadDate: new Date().toISOString(),
-        isSample: healthData.metadata?.truncated || false,
-        originalFileSize: healthData.metadata?.originalSize
+        originalFileSize: healthData.metadata?.originalSize,
+        tooLarge: healthData.metadata?.tooLarge || false,
+        cdaTooLarge: healthData.metadata?.cdaTooLarge || false
       };
 
       onDataLoaded?.(aggregatedData);
       setUploadedData(aggregatedData);
       setSuccess(true);
-      const sampleNote = aggregatedData.isSample ? ' (showing sample from large file)' : '';
-      setProgress(`Successfully loaded ${aggregatedData.totalRecords} records, ${aggregatedData.totalWorkouts} workouts, ${aggregatedData.totalECGs} ECGs${sampleNote}`);
+      const sizeNote = aggregatedData.tooLarge
+        ? ' (main records skipped due to file size)'
+        : '';
+      setProgress(`Successfully loaded ${aggregatedData.totalRecords} records, ${aggregatedData.totalWorkouts} workouts, ${aggregatedData.totalECGs} ECGs${sizeNote}`);
     } catch (err) {
       setError(err.message || 'Failed to parse file');
       console.error(err);
@@ -102,9 +105,9 @@ export default function FileUploader({ onDataLoaded }) {
           <CheckCircle size={20} />
           <div>
             <p>{progress}</p>
-            {uploadedData?.isSample && (
+            {uploadedData?.tooLarge && (
               <p style={{ fontSize: '12px', marginTop: '4px', opacity: 0.8 }}>
-                Note: Due to file size, showing a representative sample of your data
+                Note: Main records were skipped because the XML file is too large to parse in the browser.
               </p>
             )}
           </div>
