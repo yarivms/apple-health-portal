@@ -15,7 +15,7 @@ const LIMITS = {
 
 const app = express();
 const allowedOrigins = new Set(
-  (process.env.FRONTEND_ORIGINS || 'https://yarivms.github.io')
+  (process.env.FRONTEND_ORIGINS || 'https://yarivms.github.io,http://localhost:5173,http://127.0.0.1:5173')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean)
@@ -38,6 +38,7 @@ app.get('/health', (_req, res) => {
 });
 
 app.post('/api/parse', (req, res) => {
+  console.log('[API] POST /api/parse - Request received');
   const stats = createStats();
   const busboy = Busboy({
     headers: req.headers,
@@ -65,13 +66,17 @@ app.post('/api/parse', (req, res) => {
     fileHandled = true;
     stats.uploadedFileName = info?.filename || null;
     stats.uploadedMimeType = info?.mimeType || null;
+    console.log(`[API] File received: ${info?.filename}, type: ${info?.mimeType}`);
 
+    console.log('[API] Starting ZIP parse...');
     parseZipStream(file, stats)
       .then(() => {
         finalizeStats(stats);
+        console.log(`[API] Parse complete: ${stats.totalRecords} records, ${stats.totalWorkouts} workouts`);
         sendOnce(200, stats);
       })
       .catch((err) => {
+        console.error('[API] Parse error:', err.message);
         sendOnce(400, { error: err.message || 'Failed to parse ZIP' });
       });
   });
