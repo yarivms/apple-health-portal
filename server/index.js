@@ -3,6 +3,7 @@ import cors from 'cors';
 import Busboy from 'busboy';
 import unzipper from 'unzipper';
 import { SaxesParser } from 'saxes';
+import { Readable } from 'stream';
 
 const PORT = process.env.PORT || 8080;
 
@@ -85,9 +86,8 @@ app.post('/api/parse', (req, res) => {
       const buffer = Buffer.concat(chunks);
       console.log('[API] Starting ZIP parse from buffer...');
       
-      // Parse from buffer using unzipper's fromBuffer
-      const stream = require('stream');
-      const bufferStream = stream.Readable.from(buffer);
+      // Parse from buffer
+      const bufferStream = Readable.from(buffer);
       
       parseZipStream(bufferStream, stats)
         .then(() => {
