@@ -138,26 +138,31 @@ function parseZipStream(stream, stats) {
       }
 
       if (isZip(path)) {
+        console.log(`[ZIP] Found nested ZIP: ${path}`);
         tasks.push(parseZipStream(entry, stats));
         return;
       }
 
       if (isExportXml(path)) {
+        console.log(`[ZIP] Found export XML: ${path}`);
         tasks.push(parseHealthXml(entry, stats, 'main'));
         return;
       }
 
       if (isCdaXml(path)) {
+        console.log(`[ZIP] Found clinical XML: ${path}`);
         tasks.push(parseHealthXml(entry, stats, 'clinical'));
         return;
       }
 
       if (isEcgXml(path)) {
+        console.log(`[ZIP] Found ECG XML: ${path}`);
         tasks.push(parseEcgXml(entry, stats, path));
         return;
       }
 
       if (isRouteFile(path)) {
+        console.log(`[ZIP] Found route file: ${path}`);
         tasks.push(parseRouteFile(entry, stats, path));
         return;
       }
@@ -166,6 +171,7 @@ function parseZipStream(stream, stats) {
     });
 
     zip.on('close', () => {
+      console.log(`[ZIP] All entries processed, waiting for ${tasks.length} parsing tasks...`);
       Promise.all(tasks).then(resolve).catch(reject);
     });
     zip.on('error', reject);
@@ -174,7 +180,10 @@ function parseZipStream(stream, stats) {
 
 function parseHealthXml(stream, stats, target) {
   return new Promise((resolve, reject) => {
+    console.log(`[XML] Starting ${target} XML parsing...`);
     const parser = new SaxesParser({ xmlns: false });
+    let recordCount = 0;
+    let workoutCount = 0;
 
     parser.on('error', (err) => {
       stats.warnings.push(`${target} XML parse error: ${err.message}`);
@@ -185,6 +194,10 @@ function parseHealthXml(stream, stats, target) {
     parser.on('opentag', (node) => {
       if (node.name === 'Record') {
         stats.totalRecords += 1;
+        recordCount += 1;
+        if (recordCount % 10000 === 0) {
+          console.log(`[XML] ${target}: Processed ${recordCount} records...`);
+        }
         const record = {
           type: getAttr(node, 'type'),
           startDate: getAttr(node, 'startDate'),
@@ -212,6 +225,10 @@ function parseHealthXml(stream, stats, target) {
 
       if (node.name === 'Workout') {
         stats.totalWorkouts += 1;
+        workoutCount += 1;
+        if (workoutCount % 1000 === 0) {
+          console.log(`[XML] ${target}: Processed ${workoutCount} workouts...`);
+        }
         const workout = {
           workoutActivityType: getAttr(node, 'workoutActivityType'),
           startDate: getAttr(node, 'startDate'),
@@ -238,6 +255,7 @@ function parseHealthXml(stream, stats, target) {
 
     stream.on('end', () => {
       parser.close();
+      console.log(`[XML] ${target} XML parsing complete: ${recordCount} records, ${workoutCount} workouts`);
       resolve();
     });
 
