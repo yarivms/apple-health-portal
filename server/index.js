@@ -14,7 +14,24 @@ const LIMITS = {
 };
 
 const app = express();
-app.use(cors({ origin: true }));
+const allowedOrigins = new Set(
+  (process.env.FRONTEND_ORIGINS || 'https://yarivms.github.io')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.has(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error('Origin not allowed by CORS'));
+    }
+  })
+);
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true });

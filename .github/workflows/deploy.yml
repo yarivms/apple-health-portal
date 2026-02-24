@@ -31,6 +31,8 @@ jobs:
         run: npm ci
 
       - name: Build
+        env:
+          VITE_API_BASE_URL: https://WatchHealth.azurewebsites.net
         run: npx vite build
 
       - name: Upload artifact
