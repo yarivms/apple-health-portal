@@ -68,17 +68,43 @@ app.post('/api/parse', (req, res) => {
     stats.uploadedMimeType = info?.mimeType || null;
     console.log(`[API] File received: ${info?.filename}, type: ${info?.mimeType}`);
 
-    console.log('[API] Starting ZIP parse...');
-    parseZipStream(file, stats)
-      .then(() => {
-        finalizeStats(stats);
-        console.log(`[API] Parse complete: ${stats.totalRecords} records, ${stats.totalWorkouts} workouts`);
-        sendOnce(200, stats);
-      })
-      .catch((err) => {
-        console.error('[API] Parse error:', err.message);
-        sendOnce(400, { error: err.message || 'Failed to parse ZIP' });
-      });
+    // Buffer the entire file into memory first
+    const chunks = [];
+    let totalBytes = 0;
+
+    file.on('data', (chunk) => {
+      chunks.push(chunk);
+      totalBytes += chunk.length;
+      if (totalBytes % (10 * 1024 * 1024) < 65536) { // Log roughly every 10MB
+        console.log(`[UPLOAD] Received ${(totalBytes / 1024 / 1024).toFixed(1)} MB`);
+      }
+    });
+
+    file.on('end', () => {
+      console.log(`[UPLOAD] Upload complete: ${(totalBytes / 1024 / 1024).toFixed(1)} MB`);
+      const buffer = Buffer.concat(chunks);
+      console.log('[API] Starting ZIP parse from buffer...');
+      
+      // Parse from buffer using unzipper's fromBuffer
+      const stream = require('stream');
+      const bufferStream = stream.Readable.from(buffer);
+      
+      parseZipStream(bufferStream, stats)
+        .then(() => {
+          finalizeStats(stats);
+          console.log(`[API] Parse complete: ${stats.totalRecords} records, ${stats.totalWorkouts} workouts`);
+          sendOnce(200, stats);
+        })
+        .catch((err) => {
+          console.error('[API] Parse error:', err.message);
+          sendOnce(400, { error: err.message || 'Failed to parse ZIP' });
+        });
+    });
+
+    file.on('error', (err) => {
+      console.error('[UPLOAD] File stream error:', err.message);
+      sendOnce(400, { error: 'Upload failed' });
+    });
   });
 
   busboy.on('finish', () => {
