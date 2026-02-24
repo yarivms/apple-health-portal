@@ -3,7 +3,6 @@ import cors from 'cors';
 import Busboy from 'busboy';
 import unzipper from 'unzipper';
 import { SaxesParser } from 'saxes';
-import { PassThrough } from 'stream';
 
 const PORT = process.env.PORT || 8080;
 
@@ -51,7 +50,6 @@ app.post('/api/parse', (req, res) => {
 
   let fileHandled = false;
   let responded = false;
-  let bytesReceived = 0;
 
   const sendOnce = (status, payload) => {
     if (responded) return;
@@ -69,14 +67,6 @@ app.post('/api/parse', (req, res) => {
     stats.uploadedFileName = info?.filename || null;
     stats.uploadedMimeType = info?.mimeType || null;
     console.log(`[API] File received: ${info?.filename}, type: ${info?.mimeType}`);
-
-    // Monitor bytes received without interfering with stream flow
-    file.on('data', (chunk) => {
-      bytesReceived += chunk.length;
-      if (bytesReceived % (10 * 1024 * 1024) === 0 || bytesReceived < 100000) {
-        console.log(`[STREAM] Received ${(bytesReceived / 1024 / 1024).toFixed(2)} MB`);
-      }
-    });
 
     console.log('[API] Starting ZIP parse...');
     parseZipStream(file, stats)
