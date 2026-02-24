@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import { Upload, AlertCircle, CheckCircle } from 'lucide-react';
 import { parseAppleHealthZip, extractHealthRecords, extractWorkouts, extractECGData } from '../utils/zipParser';
 import './FileUploader.css';
@@ -9,6 +10,7 @@ export default function FileUploader({ onDataLoaded }) {
   const [success, setSuccess] = useState(false);
   const [progress, setProgress] = useState('');
   const [uploadedData, setUploadedData] = useState(null);
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
 
   const handleFileUpload = async (event) => {
     const file = event.target.files?.[0];
@@ -20,38 +22,68 @@ export default function FileUploader({ onDataLoaded }) {
     setProgress('Parsing ZIP file...');
 
     try {
-      // Parse ZIP
-      setProgress('Extracting health data...');
-      const healthData = await parseAppleHealthZip(file);
+      let aggregatedData;
 
-      // Extract records
-      setProgress('Processing health records...');
-      const mainRecords = healthData.mainData
-        ? extractHealthRecords(healthData.mainData)
-        : [];
-      const clinicalRecords = healthData.clinicalData
-        ? extractHealthRecords(healthData.clinicalData)
-        : [];
-      const workouts = healthData.mainData
-        ? extractWorkouts(healthData.mainData)
-        : [];
-      const ecgs = healthData.ecgs.map(ecg => extractECGData(ecg.data)).filter(Boolean);
+      if (apiBaseUrl) {
+        const formData = new FormData();
+        formData.append('file', file);
 
-      setProgress('Aggregating data...');
-      const aggregatedData = {
-        totalRecords: mainRecords.length + clinicalRecords.length,
-        totalWorkouts: workouts.length,
-        totalECGs: ecgs.length,
-        mainRecords,
-        clinicalRecords,
-        workouts,
-        ecgs,
-        fileSize: file.size,
-        uploadDate: new Date().toISOString(),
-        originalFileSize: healthData.metadata?.originalSize,
-        tooLarge: healthData.metadata?.tooLarge || false,
-        cdaTooLarge: healthData.metadata?.cdaTooLarge || false
-      };
+        setProgress('Uploading to server...');
+        const response = await axios.post(`${apiBaseUrl.replace(/\/$/, '')}/api/parse`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          onUploadProgress: (event) => {
+            if (!event.total) return;
+            const percent = Math.round((event.loaded / event.total) * 100);
+            setProgress(`Uploading to server... ${percent}%`);
+          }
+        });
+
+        const serverData = response.data || {};
+        aggregatedData = {
+          ...serverData,
+          fileSize: file.size,
+          uploadDate: new Date().toISOString(),
+          originalFileSize: serverData.originalFileSize || null,
+          tooLarge: false,
+          cdaTooLarge: false,
+          warnings: serverData.warnings || []
+        };
+      } else {
+        // Parse ZIP in the browser
+        setProgress('Extracting health data...');
+        const healthData = await parseAppleHealthZip(file);
+
+        // Extract records
+        setProgress('Processing health records...');
+        const mainRecords = healthData.mainData
+          ? extractHealthRecords(healthData.mainData)
+          : [];
+        const clinicalRecords = healthData.clinicalData
+          ? extractHealthRecords(healthData.clinicalData)
+          : [];
+        const workouts = healthData.mainData
+          ? extractWorkouts(healthData.mainData)
+          : [];
+        const ecgs = healthData.ecgs.map(ecg => extractECGData(ecg.data)).filter(Boolean);
+
+        setProgress('Aggregating data...');
+        aggregatedData = {
+          totalRecords: mainRecords.length + clinicalRecords.length,
+          totalWorkouts: workouts.length,
+          totalECGs: ecgs.length,
+          mainRecords,
+          clinicalRecords,
+          workouts,
+          ecgs,
+          workoutRoutes: healthData.workoutRoutes || [],
+          fileSize: file.size,
+          uploadDate: new Date().toISOString(),
+          originalFileSize: healthData.metadata?.originalSize,
+          tooLarge: healthData.metadata?.tooLarge || false,
+          cdaTooLarge: healthData.metadata?.cdaTooLarge || false,
+          warnings: []
+        };
+      }
 
       onDataLoaded?.(aggregatedData);
       setUploadedData(aggregatedData);
@@ -61,7 +93,8 @@ export default function FileUploader({ onDataLoaded }) {
         : '';
       setProgress(`Successfully loaded ${aggregatedData.totalRecords} records, ${aggregatedData.totalWorkouts} workouts, ${aggregatedData.totalECGs} ECGs${sizeNote}`);
     } catch (err) {
-      setError(err.message || 'Failed to parse file');
+      const serverMessage = err?.response?.data?.error;
+      setError(serverMessage || err.message || 'Failed to parse file');
       console.error(err);
     } finally {
       setLoading(false);
@@ -108,6 +141,16 @@ export default function FileUploader({ onDataLoaded }) {
             {uploadedData?.tooLarge && (
               <p style={{ fontSize: '12px', marginTop: '4px', opacity: 0.8 }}>
                 Note: Main records were skipped because the XML file is too large to parse in the browser.
+              </p>
+            )}
+            {(uploadedData?.recordsTruncated || uploadedData?.clinicalTruncated || uploadedData?.workoutsTruncated || uploadedData?.routesTruncated || uploadedData?.ecgSamplesTruncated) && (
+              <p style={{ fontSize: '12px', marginTop: '4px', opacity: 0.8 }}>
+                Note: Some data was truncated during parsing to keep processing fast.
+              </p>
+            )}
+            {uploadedData?.warnings?.length > 0 && (
+              <p style={{ fontSize: '12px', marginTop: '4px', opacity: 0.8 }}>
+                Note: {uploadedData.warnings.length} parsing warnings were reported.
               </p>
             )}
           </div>

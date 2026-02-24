@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:server": "npm --prefix server run dev",
+    "start:server": "npm --prefix server run start"
   },
   "dependencies": {
     "axios": "^1.13.5",
