@@ -3,6 +3,7 @@ import cors from 'cors';
 import Busboy from 'busboy';
 import unzipper from 'unzipper';
 import { SaxesParser } from 'saxes';
+import { PassThrough } from 'stream';
 
 const PORT = process.env.PORT || 8080;
 
@@ -50,6 +51,7 @@ app.post('/api/parse', (req, res) => {
 
   let fileHandled = false;
   let responded = false;
+  let bytesReceived = 0;
 
   const sendOnce = (status, payload) => {
     if (responded) return;
@@ -68,8 +70,26 @@ app.post('/api/parse', (req, res) => {
     stats.uploadedMimeType = info?.mimeType || null;
     console.log(`[API] File received: ${info?.filename}, type: ${info?.mimeType}`);
 
+    // Create a PassThrough stream to monitor progress
+    const monitor = new PassThrough();
+    monitor.on('data', (chunk) => {
+      bytesReceived += chunk.length;
+      if (bytesReceived % (10 * 1024 * 1024) === 0 || bytesReceived < 100000) {
+        console.log(`[STREAM] Received ${(bytesReceived / 1024 / 1024).toFixed(2)} MB`);
+      }
+    });
+
+    monitor.on('end', () => {
+      console.log(`[STREAM] Stream ended. Total: ${(bytesReceived / 1024 / 1024).toFixed(2)} MB`);
+    });
+
+    monitor.on('error', (err) => {
+      console.error('[STREAM] Stream error:', err.message);
+    });
+
     console.log('[API] Starting ZIP parse...');
-    parseZipStream(file, stats)
+    file.pipe(monitor);
+    parseZipStream(monitor, stats)
       .then(() => {
         finalizeStats(stats);
         console.log(`[API] Parse complete: ${stats.totalRecords} records, ${stats.totalWorkouts} workouts`);
@@ -82,12 +102,14 @@ app.post('/api/parse', (req, res) => {
   });
 
   busboy.on('finish', () => {
+    console.log('[BUSBOY] Finish event fired');
     if (!fileHandled && !responded) {
       sendOnce(400, { error: 'No file uploaded' });
     }
   });
 
   busboy.on('error', (err) => {
+    console.error('[BUSBOY] Error:', err.message);
     sendOnce(400, { error: err.message || 'Upload failed' });
   });
 
@@ -127,11 +149,13 @@ function finalizeStats(stats) {
 
 function parseZipStream(stream, stats) {
   return new Promise((resolve, reject) => {
+    console.log('[ZIP] Starting parseZipStream...');
     const tasks = [];
     const zip = stream.pipe(unzipper.Parse({ forceStream: true }));
 
     zip.on('entry', (entry) => {
       const path = entry.path || '';
+      console.log(`[ZIP] Entry found: path="${path}", type="${entry.type}"`);
       if (entry.type !== 'File') {
         entry.autodrain();
         return;
@@ -171,10 +195,16 @@ function parseZipStream(stream, stats) {
     });
 
     zip.on('close', () => {
-      console.log(`[ZIP] All entries processed, waiting for ${tasks.length} parsing tasks...`);
+      console.log(`[ZIP] ZIP close event - All entries processed, waiting for ${tasks.length} parsing tasks...`);
       Promise.all(tasks).then(resolve).catch(reject);
     });
-    zip.on('error', reject);
+    zip.on('error', (err) => {
+      console.error('[ZIP] ZIP error:', err.message);
+      reject(err);
+    });
+    zip.on('finish', () => {
+      console.log('[ZIP] ZIP finish event');
+    });
   });
 }
 
