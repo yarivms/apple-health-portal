@@ -32,10 +32,14 @@ export default function FileUploader({ onDataLoaded }) {
         const response = await axios.post(`${apiBaseUrl.replace(/\/$/, '')}/api/parse`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
           timeout: 600000, // 10 minutes
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
           onUploadProgress: (event) => {
             if (!event.total) return;
             const percent = Math.round((event.loaded / event.total) * 100);
-            setProgress(`Uploading to server... ${percent}%`);
+            const mbLoaded = (event.loaded / 1024 / 1024).toFixed(1);
+            const mbTotal = (event.total / 1024 / 1024).toFixed(1);
+            setProgress(`Uploading to server... ${percent}% (${mbLoaded}/${mbTotal} MB)`);
             if (percent === 100) {
               setProgress('Processing ZIP file on server... (this may take a few minutes for large files)');
             }

@@ -70,26 +70,16 @@ app.post('/api/parse', (req, res) => {
     stats.uploadedMimeType = info?.mimeType || null;
     console.log(`[API] File received: ${info?.filename}, type: ${info?.mimeType}`);
 
-    // Create a PassThrough stream to monitor progress
-    const monitor = new PassThrough();
-    monitor.on('data', (chunk) => {
+    // Monitor bytes received without interfering with stream flow
+    file.on('data', (chunk) => {
       bytesReceived += chunk.length;
       if (bytesReceived % (10 * 1024 * 1024) === 0 || bytesReceived < 100000) {
         console.log(`[STREAM] Received ${(bytesReceived / 1024 / 1024).toFixed(2)} MB`);
       }
     });
 
-    monitor.on('end', () => {
-      console.log(`[STREAM] Stream ended. Total: ${(bytesReceived / 1024 / 1024).toFixed(2)} MB`);
-    });
-
-    monitor.on('error', (err) => {
-      console.error('[STREAM] Stream error:', err.message);
-    });
-
     console.log('[API] Starting ZIP parse...');
-    file.pipe(monitor);
-    parseZipStream(monitor, stats)
+    parseZipStream(file, stats)
       .then(() => {
         finalizeStats(stats);
         console.log(`[API] Parse complete: ${stats.totalRecords} records, ${stats.totalWorkouts} workouts`);
