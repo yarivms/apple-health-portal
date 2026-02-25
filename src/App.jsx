@@ -13,6 +13,7 @@ import StressAnalysis from './components/StressAnalysis';
 import FileUploader from './components/FileUploader';
 import ECGViewer from './components/ECGViewer';
 import WorkoutRoutes from './components/WorkoutRoutes';
+import WorkoutStore from './components/WorkoutStore';
 import HealthAIChat from './components/HealthAIChat';
 import './App.css';
 
@@ -391,6 +392,7 @@ function App() {
               const dashboardData = {
                 healthRecords: [],
                 workouts: data.workouts || [],
+                workoutRoutes: data.workoutRoutes || [],
                 summary: data.summary || {},
                 metricsByType: data.metricsByType || {},
                 workoutsByDate: data.workoutsByDate || {},
@@ -462,6 +464,15 @@ function App() {
                   <TrendingUp size={18} />
                   Overview
                 </button>
+                {healthData.workouts && healthData.workouts.length > 0 && (
+                  <button
+                    className={`tab-button ${activeTab === 'workouts' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('workouts')}
+                  >
+                    <Navigation size={18} />
+                    Workouts & Maps
+                  </button>
+                )}
                 {healthData.workoutsByDate && Object.keys(healthData.workoutsByDate).length > 0 && (
                   <button
                     className={`tab-button ${activeTab === 'runs' ? 'active' : ''}`}
@@ -516,6 +527,13 @@ function App() {
                   <>
                     <MetricsCards data={healthData} />
                   </>
+                )}
+                {activeTab === 'workouts' && healthData.workouts && healthData.workouts.length > 0 && (
+                  <WorkoutStore
+                    workouts={healthData.workouts}
+                    workoutRoutes={healthData.workoutRoutes || (importedHealthData?.workoutRoutes) || []}
+                    metricsByType={healthData.metricsByType}
+                  />
                 )}
                 {activeTab === 'runs' && healthData.workoutsByDate && Object.keys(healthData.workoutsByDate).length > 0 && (
                   <RunsView data={healthData} />
