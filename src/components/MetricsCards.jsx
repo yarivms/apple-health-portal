@@ -3,7 +3,7 @@ import { Heart, Footprints, Flame, Calendar, TrendingUp, Activity, Database, Bar
 import './MetricsCards.css';
 
 function MetricsCards({ data }) {
-  const { summary } = data;
+  const summary = data?.summary || {};
 
   const cards = [
     {
@@ -42,10 +42,10 @@ function MetricsCards({ data }) {
       id: 'timespan',
       icon: TrendingUp,
       title: 'Date Range',
-      stat: summary.dateRange.start && summary.dateRange.end ? 
+      stat: summary.dateRange?.start && summary.dateRange?.end ? 
         Math.round((summary.dateRange.end - summary.dateRange.start) / (1000 * 60 * 60 * 24)) : 0,
       unit: 'days',
-      subtext: summary.dateRange.start ? 
+      subtext: summary.dateRange?.start ? 
         `${new Date(summary.dateRange.start).toLocaleDateString()} to ${new Date(summary.dateRange.end).toLocaleDateString()}` 
         : 'N/A',
       color: '#8b5cf6',
