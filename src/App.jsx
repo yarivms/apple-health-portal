@@ -13,6 +13,7 @@ import StressAnalysis from './components/StressAnalysis';
 import FileUploader from './components/FileUploader';
 import WorkoutStore from './components/WorkoutStore';
 import HealthAIChat from './components/HealthAIChat';
+import ApiSettings from './components/ApiSettings';
 import './App.css';
 
 // Advanced parser with proper aggregation and statistics
@@ -376,6 +377,7 @@ function App() {
         <>
           <header className="hero-header">
             <div className="hero-glow" />
+            <div className="hero-topbar"><ApiSettings /></div>
             <div className="hero-content">
               <div className="hero-badge">Apple Health Portal</div>
               <h1 className="hero-title">
@@ -457,17 +459,20 @@ function App() {
                 <Heart size={22} className="dash-heart" />
                 <span>Health Portal</span>
               </div>
-              <button
-                className="reload-btn"
-                onClick={() => {
-                  setHealthData(null);
-                  setImportedHealthData(null);
-                  fileInputRef.current = null;
-                }}
-              >
-                <RotateCcw size={16} />
-                Load Different File
-              </button>
+              <div className="dash-header-actions">
+                <ApiSettings />
+                <button
+                  className="reload-btn"
+                  onClick={() => {
+                    setHealthData(null);
+                    setImportedHealthData(null);
+                    fileInputRef.current = null;
+                  }}
+                >
+                  <RotateCcw size={16} />
+                  Load Different File
+                </button>
+              </div>
             </div>
           </header>
 

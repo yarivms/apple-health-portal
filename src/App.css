@@ -66,6 +66,12 @@ body {
     radial-gradient(circle at 80% 80%, rgba(0,0,0,.10) 0%, transparent 50%);
   pointer-events: none;
 }
+.hero-topbar {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  z-index: 10;
+}
 .hero-content {
   position: relative;
   max-width: 640px;
@@ -190,6 +196,11 @@ body {
   color: var(--text-primary);
 }
 .dash-heart { color: var(--red); }
+.dash-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .reload-btn {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 6px 14px;

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { Upload, AlertCircle, CheckCircle } from 'lucide-react';
 import { parseAppleHealthZip, extractHealthRecords, extractWorkouts, extractECGData } from '../utils/zipParser';
+import { getApiBaseUrl } from '../utils/apiConfig';
 import './FileUploader.css';
 
 export default function FileUploader({ onDataLoaded }) {
@@ -10,7 +11,7 @@ export default function FileUploader({ onDataLoaded }) {
   const [success, setSuccess] = useState(false);
   const [progress, setProgress] = useState('');
   const [uploadedData, setUploadedData] = useState(null);
-  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
+  const apiBaseUrl = getApiBaseUrl();
 
   const handleFileUpload = async (event) => {
     const file = event.target.files?.[0];

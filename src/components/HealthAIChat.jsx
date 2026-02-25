@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { MessageSquare, Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
+import { getApiBaseUrl } from '../utils/apiConfig';
 import './HealthAIChat.css';
 
 const SUGGESTED_QUESTIONS = [
@@ -19,7 +20,7 @@ export default function HealthAIChat({ healthData, importedHealthData }) {
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
-  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
+  const apiBaseUrl = getApiBaseUrl();
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
