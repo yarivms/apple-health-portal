@@ -1,9 +1,84 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   MapPin, Calendar, Clock, Zap, Gauge, TrendingUp,
-  ChevronDown, ChevronUp, Footprints, ArrowUpDown, Trophy
+  ChevronDown, ChevronUp, Footprints, ArrowUpDown, Trophy, Mountain
 } from 'lucide-react';
+import { MapContainer, TileLayer, Polyline, CircleMarker, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import './RunsView.css';
+
+// ---- map components ---------------------------------------------------------
+
+function FitBounds({ points }) {
+  const map = useMap();
+  useEffect(() => {
+    if (points.length > 1) {
+      const lats = points.map(p => p.lat).filter(Boolean);
+      const lons = points.map(p => p.lon).filter(Boolean);
+      if (lats.length > 1) {
+        map.fitBounds([
+          [Math.min(...lats), Math.min(...lons)],
+          [Math.max(...lats), Math.max(...lons)]
+        ], { padding: [30, 30] });
+      }
+    }
+  }, [points, map]);
+  return null;
+}
+
+function RouteMap({ points, color }) {
+  if (!points || points.length < 2) return null;
+  const positions = points.filter(p => p.lat && p.lon).map(p => [p.lat, p.lon]);
+  if (positions.length < 2) return null;
+  const startPos = positions[0];
+  const endPos = positions[positions.length - 1];
+
+  return (
+    <MapContainer
+      center={startPos}
+      zoom={14}
+      scrollWheelZoom={false}
+      className="run-map-container"
+      attributionControl={false}
+    >
+      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+      <Polyline positions={positions} pathOptions={{ color: color || '#FF3B30', weight: 4, opacity: 0.9 }} />
+      <CircleMarker center={startPos} radius={6} pathOptions={{ color: '#fff', fillColor: '#34C759', fillOpacity: 1, weight: 2 }} />
+      <CircleMarker center={endPos}   radius={6} pathOptions={{ color: '#fff', fillColor: '#FF3B30', fillOpacity: 1, weight: 2 }} />
+      <FitBounds points={points} />
+    </MapContainer>
+  );
+}
+
+function ElevationProfile({ points }) {
+  if (!points || points.length < 10) return null;
+  const elePoints = points.filter(p => p.elevation != null).map((p, i) => ({
+    idx: i, ele: parseFloat(p.elevation)
+  }));
+  if (elePoints.length < 10) return null;
+  const minEle = Math.min(...elePoints.map(p => p.ele));
+  const maxEle = Math.max(...elePoints.map(p => p.ele));
+  const range = maxEle - minEle || 1;
+  const w = 100, h = 40;
+  const pathD = elePoints.map((p, i) => {
+    const x = (i / (elePoints.length - 1)) * w;
+    const y = h - ((p.ele - minEle) / range) * (h - 4) - 2;
+    return `${i === 0 ? 'M' : 'L'}${x},${y}`;
+  }).join(' ');
+
+  return (
+    <div className="run-elevation-profile">
+      <div className="elevation-label">
+        <Mountain size={14} />
+        <span>{Math.round(minEle)}–{Math.round(maxEle)} m</span>
+      </div>
+      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="elevation-svg">
+        <path d={`${pathD} L${w},${h} L0,${h} Z`} fill="rgba(52,199,89,0.2)" stroke="none" />
+        <path d={pathD} fill="none" stroke="#34C759" strokeWidth="0.8" />
+      </svg>
+    </div>
+  );
+}
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -334,7 +409,17 @@ function RunsView({ workouts, workoutRoutes }) {
             </div>
 
             {expandedRun === idx && (
-              <div className="run-details">
+              <div className="run-details" onClick={(e) => e.stopPropagation()}>
+                {/* Route Map */}
+                {run.hasMap && (
+                  <div className="run-detail-map">
+                    <RouteMap points={run.route.points} color="#FF3B30" />
+                  </div>
+                )}
+
+                {/* Elevation Profile */}
+                {run.hasMap && <ElevationProfile points={run.route.points} />}
+
                 <div className="details-grid">
                   {run.dist && (
                     <div className="detail-item">
@@ -388,13 +473,6 @@ function RunsView({ workouts, workoutRoutes }) {
                     </div>
                   )}
                 </div>
-
-                {run.hasMap && (
-                  <div className="run-map-note">
-                    <MapPin size={16} />
-                    <span>GPS route available — see this run in the <strong>Workouts</strong> tab for the full map view</span>
-                  </div>
-                )}
               </div>
             )}
           </div>

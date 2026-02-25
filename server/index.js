@@ -108,8 +108,20 @@ app.post('/api/parse', (req, res) => {
           const runs = stats.workouts.filter(w => w.workoutActivityType === 'HKWorkoutActivityTypeRunning');
           console.log(`[DEBUG] Running workouts: ${runs.length}`);
           if (runs.length > 0) {
+            console.log('[DEBUG] First 3 runs:', JSON.stringify(runs.slice(0, 3).map(r => ({
+              type: r.workoutActivityType,
+              date: r.startDate,
+              distance: r.totalDistance,
+              distUnit: r.totalDistanceUnit,
+              duration: r.duration,
+              durUnit: r.durationUnit,
+              energy: r.totalEnergyBurned,
+              energyUnit: r.totalEnergyBurnedUnit,
+            })), null, 2));
             const longest = runs.reduce((a, b) => (parseFloat(a.totalDistance) || 0) > (parseFloat(b.totalDistance) || 0) ? a : b);
             console.log('[DEBUG] Longest run:', JSON.stringify(longest, null, 2));
+            const noDistance = runs.filter(r => !r.totalDistance || r.totalDistance === '0');
+            console.log(`[DEBUG] Runs without distance: ${noDistance.length} of ${runs.length}`);
           }
         }
 
@@ -526,6 +538,7 @@ function parseHealthXml(stream, stats, target) {
     let workoutCount = 0;
     let ecgCount = 0;
     let currentEcg = null; // tracks the <Electrocardiogram> we're inside
+    let currentWorkout = null; // tracks the <Workout> we're inside for child elements
 
     parser.on('error', (err) => {
       stats.warnings.push(`${target} XML parse error: ${err.message}`);
@@ -574,7 +587,7 @@ function parseHealthXml(stream, stats, target) {
         if (workoutCount % 1000 === 0) {
           console.log(`[XML] ${target}: Processed ${workoutCount} workouts...`);
         }
-        const workout = {
+        currentWorkout = {
           workoutActivityType: getAttr(node, 'workoutActivityType'),
           startDate: getAttr(node, 'startDate'),
           endDate: getAttr(node, 'endDate'),
@@ -585,14 +598,29 @@ function parseHealthXml(stream, stats, target) {
           totalDistance: getAttr(node, 'totalDistance'),
           totalDistanceUnit: getAttr(node, 'totalDistanceUnit')
         };
+        // If the <Workout> tag is self-closing, it won't trigger closetag,
+        // but SaxesParser treats self-closing as open+close, so closetag handles it.
+      }
 
-        // Always aggregate for dashboard
-        aggregateWorkout(stats, workout);
+      // Handle <WorkoutStatistics> child elements inside <Workout>
+      // These carry distance, energy, etc. in newer Apple Health exports (iOS 16+)
+      if (node.name === 'WorkoutStatistics' && currentWorkout) {
+        const statType = getAttr(node, 'type') || '';
+        const sum = getAttr(node, 'sum');
+        const unit = getAttr(node, 'unit');
 
-        if (stats.workouts.length < LIMITS.MAX_WORKOUTS) {
-          stats.workouts.push(workout);
-        } else {
-          stats.workoutsTruncated = true;
+        if (statType.includes('DistanceWalkingRunning') || statType.includes('DistanceCycling') || statType.includes('DistanceSwimming') || statType.includes('DistanceDownhillSnowSports')) {
+          // Only overwrite if the attribute was empty/missing
+          if (sum && (!currentWorkout.totalDistance || currentWorkout.totalDistance === '0')) {
+            currentWorkout.totalDistance = sum;
+            currentWorkout.totalDistanceUnit = unit || 'km';
+          }
+        }
+        if (statType.includes('ActiveEnergyBurned') || statType.includes('BasalEnergyBurned')) {
+          if (sum && statType.includes('ActiveEnergyBurned') && (!currentWorkout.totalEnergyBurned || currentWorkout.totalEnergyBurned === '0')) {
+            currentWorkout.totalEnergyBurned = sum;
+            currentWorkout.totalEnergyBurnedUnit = unit || 'kcal';
+          }
         }
       }
 
@@ -629,6 +657,17 @@ function parseHealthXml(stream, stats, target) {
     });
 
     parser.on('closetag', (name) => {
+      // Finalize workout when </Workout> closes — this ensures WorkoutStatistics data is captured
+      if (name === 'Workout' && currentWorkout) {
+        aggregateWorkout(stats, currentWorkout);
+        if (stats.workouts.length < LIMITS.MAX_WORKOUTS) {
+          stats.workouts.push(currentWorkout);
+        } else {
+          stats.workoutsTruncated = true;
+        }
+        currentWorkout = null;
+      }
+
       if (name === 'Electrocardiogram' && currentEcg) {
         if (stats.ecgs.length < LIMITS.MAX_ECGS) {
           stats.ecgs.push(currentEcg);
