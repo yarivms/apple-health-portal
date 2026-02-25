@@ -13,6 +13,7 @@ import StressAnalysis from './components/StressAnalysis';
 import FileUploader from './components/FileUploader';
 import ECGViewer from './components/ECGViewer';
 import WorkoutRoutes from './components/WorkoutRoutes';
+import HealthAIChat from './components/HealthAIChat';
 import './App.css';
 
 // Advanced parser with proper aggregation and statistics
@@ -386,6 +387,16 @@ function App() {
           <div className="upload-section">
             <FileUploader onDataLoaded={(data) => {
               setImportedHealthData(data);
+              // Transform server response into dashboard-compatible healthData
+              const dashboardData = {
+                healthRecords: [],
+                workouts: data.workouts || [],
+                summary: data.summary || {},
+                metricsByType: data.metricsByType || {},
+                workoutsByDate: data.workoutsByDate || {},
+                allDates: data.allDates || [],
+              };
+              setHealthData(dashboardData);
               setActiveTab('import');
             }} />
 
@@ -482,6 +493,13 @@ function App() {
                   Analytics & AI
                 </button>
                 <button
+                  className={`tab-button ${activeTab === 'ai-chat' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('ai-chat')}
+                >
+                  <Sparkles size={18} />
+                  AI Chat
+                </button>
+                <button
                   className={`tab-button ${activeTab === 'import' ? 'active' : ''}`}
                   onClick={() => setActiveTab('import')}
                 >
@@ -527,6 +545,9 @@ function App() {
                       <StressAnalysis metricsByType={healthData.metricsByType} allDates={healthData.allDates} />
                     </div>
                   </div>
+                )}
+                {activeTab === 'ai-chat' && (
+                  <HealthAIChat healthData={healthData} importedHealthData={importedHealthData} />
                 )}
                 {activeTab === 'import' && (
                   <div className="import-section">

@@ -1,9 +1,11 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import Busboy from 'busboy';
 import unzipper from 'unzipper';
 import { SaxesParser } from 'saxes';
 import { Readable } from 'stream';
+import OpenAI from 'openai';
 
 const PORT = process.env.PORT || 8080;
 
@@ -95,7 +97,8 @@ app.post('/api/parse', (req, res) => {
         await parseZipFromDirectory(directory, stats);
         
         finalizeStats(stats);
-        console.log(`[API] Parse complete: ${stats.totalRecords} records, ${stats.totalWorkouts} workouts`);
+        console.log(`[API] Parse complete: ${stats.totalRecords} records, ${stats.totalWorkouts} workouts, ${stats.totalECGs} ECGs, ${stats.totalRoutes} routes`);
+        console.log(`[API] Warnings: ${stats.warnings.length}`, stats.warnings.slice(0, 10));
         sendOnce(200, stats);
       } catch (err) {
         console.error('[API] Parse error:', err.message);
@@ -124,6 +127,100 @@ app.post('/api/parse', (req, res) => {
   req.pipe(busboy);
 });
 
+// --- AI Chat endpoint ---
+app.use(express.json({ limit: '2mb' }));
+
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
+
+app.post('/api/ask', async (req, res) => {
+  if (!openai) {
+    return res.status(500).json({ error: 'OPENAI_API_KEY is not configured on the server.' });
+  }
+
+  const { question, healthSummary, conversationHistory } = req.body;
+  if (!question) {
+    return res.status(400).json({ error: 'Missing "question" field.' });
+  }
+
+  console.log(`[AI] Question: ${question.slice(0, 120)}...`);
+
+  // Build a compact context string from the health summary
+  let contextStr = '';
+  if (healthSummary) {
+    const parts = [];
+    if (healthSummary.totalRecords) parts.push(`Total health records: ${healthSummary.totalRecords}`);
+    if (healthSummary.totalWorkouts) parts.push(`Total workouts: ${healthSummary.totalWorkouts}`);
+    if (healthSummary.totalECGs) parts.push(`Total ECGs: ${healthSummary.totalECGs}`);
+    if (healthSummary.allDates?.length) {
+      parts.push(`Date range: ${healthSummary.allDates[0]} to ${healthSummary.allDates[healthSummary.allDates.length - 1]}`);
+      parts.push(`Days tracked: ${healthSummary.allDates.length}`);
+    }
+    if (healthSummary.workoutsByDate) {
+      const totalWk = Object.values(healthSummary.workoutsByDate).reduce((a, b) => a + b, 0);
+      const wkDays = Object.keys(healthSummary.workoutsByDate).length;
+      parts.push(`Workout days: ${wkDays}, Total workout sessions: ${totalWk}`);
+    }
+    if (healthSummary.topMetrics) {
+      parts.push('\\nTop health metrics:');
+      for (const m of healthSummary.topMetrics) {
+        const name = m.type.replace('HKQuantityTypeIdentifier', '').replace('HKCategoryTypeIdentifier', '');
+        parts.push(`  - ${name}: count=${m.count}, avg=${m.avg}, min=${m.min}, max=${m.max} ${m.unit || ''}`);
+      }
+    }
+    if (healthSummary.metricsByType) {
+      const metricNames = Object.keys(healthSummary.metricsByType)
+        .map(t => t.replace('HKQuantityTypeIdentifier', '').replace('HKCategoryTypeIdentifier', ''));
+      parts.push(`\\nAll available metric types (${metricNames.length}): ${metricNames.join(', ')}`);
+    }
+    contextStr = parts.join('\\n');
+  }
+
+  const systemPrompt = `You are a helpful health data analyst assistant for an Apple Health dashboard.
+The user has uploaded their Apple Health export data. Here is a summary of their data:
+
+${contextStr}
+
+Guidelines:
+- Answer questions about the user's health data using the summary above.
+- Provide specific numbers and insights when the data supports it.
+- If the data doesn't contain information to answer, say so clearly.
+- Be encouraging but honest. Don't make medical diagnoses.
+- Keep answers concise (2-4 paragraphs max).
+- Use metric/imperial units as appropriate for the data.
+- You can suggest health insights, trends, and actionable recommendations.`;
+
+  try {
+    const messages = [
+      { role: 'system', content: systemPrompt }
+    ];
+
+    // Include conversation history if provided (last 10 messages)
+    if (conversationHistory && Array.isArray(conversationHistory)) {
+      for (const msg of conversationHistory.slice(-10)) {
+        messages.push({ role: msg.role, content: msg.content });
+      }
+    }
+
+    messages.push({ role: 'user', content: question });
+
+    const completion = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      messages,
+      max_tokens: 1000,
+      temperature: 0.7
+    });
+
+    const answer = completion.choices?.[0]?.message?.content || 'No response generated.';
+    console.log(`[AI] Response length: ${answer.length} chars`);
+    res.json({ answer });
+  } catch (err) {
+    console.error('[AI] OpenAI error:', err.message);
+    res.status(500).json({ error: `AI request failed: ${err.message}` });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server listening on ${PORT}`);
 });
@@ -146,13 +243,108 @@ function createStats() {
     workoutsTruncated: false,
     routesTruncated: false,
     ecgSamplesTruncated: false,
-    warnings: []
+    warnings: [],
+    // Aggregated data for the dashboard (avoids sending huge arrays)
+    metricsByType: {},    // type -> { values, count, min, max, sum, unit, source }
+    workoutsByDate: {},   // YYYY-MM-DD -> count
+    allDatesSet: new Set()
   };
+}
+
+function parseDateKey(dateStr) {
+  if (!dateStr) return null;
+  const m = dateStr.match(/(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+}
+
+function aggregateRecord(stats, record) {
+  const { type, value, endDate, unit, sourceName } = record;
+  if (!type || value === null || value === undefined) return;
+
+  const dateKey = parseDateKey(endDate);
+  if (dateKey) stats.allDatesSet.add(dateKey);
+
+  const numValue = parseFloat(value);
+  if (!stats.metricsByType[type]) {
+    stats.metricsByType[type] = {
+      values: [],
+      dates: [],
+      count: 0,
+      sum: 0,
+      min: Infinity,
+      max: -Infinity,
+      unit: unit || '',
+      source: sourceName || 'Unknown'
+    };
+  }
+
+  const metric = stats.metricsByType[type];
+  metric.count += 1;
+
+  if (!isNaN(numValue)) {
+    metric.sum += numValue;
+    if (numValue < metric.min) metric.min = numValue;
+    if (numValue > metric.max) metric.max = numValue;
+    // Sample: keep every Nth value to limit array size (~2000 per metric max)
+    if (metric.values.length < 2000 && (metric.count <= 100 || metric.count % Math.max(1, Math.floor(metric.count / 2000)) === 0)) {
+      const ts = dateKey ? new Date(dateKey).getTime() : null;
+      metric.values.push({ date: dateKey, value: numValue, timestamp: ts });
+      metric.dates.push(dateKey);
+    }
+  }
+}
+
+function aggregateWorkout(stats, workout) {
+  const dateKey = parseDateKey(workout.startDate);
+  if (dateKey) {
+    stats.allDatesSet.add(dateKey);
+    stats.workoutsByDate[dateKey] = (stats.workoutsByDate[dateKey] || 0) + 1;
+  }
 }
 
 function finalizeStats(stats) {
   stats.totalECGs = stats.ecgs.length;
   stats.totalRoutes = stats.workoutRoutes.length;
+
+  // Convert allDatesSet to sorted array
+  stats.allDates = Array.from(stats.allDatesSet).sort();
+  delete stats.allDatesSet;
+
+  // Fix Infinity values in metrics
+  for (const metric of Object.values(stats.metricsByType)) {
+    if (metric.min === Infinity) metric.min = 0;
+    if (metric.max === -Infinity) metric.max = 0;
+    if (metric.count > 0) {
+      metric.avg = +(metric.sum / metric.count).toFixed(2);
+    }
+  }
+
+  // Build compact summary
+  stats.summary = {
+    totalRecords: stats.totalRecords,
+    totalWorkouts: stats.totalWorkouts,
+    totalECGs: stats.totalECGs,
+    uniqueDates: stats.allDates.length,
+    dateRange: {
+      start: stats.allDates[0] ? new Date(stats.allDates[0]).getTime() : null,
+      end: stats.allDates.length ? new Date(stats.allDates[stats.allDates.length - 1]).getTime() : null
+    },
+    topMetrics: Object.entries(stats.metricsByType)
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 15)
+      .map(([type, data]) => ({
+        type,
+        count: data.count,
+        avg: data.avg,
+        min: data.min,
+        max: data.max,
+        unit: data.unit
+      }))
+  };
+
+  // Drop the huge raw arrays — dashboard uses metricsByType etc.
+  delete stats.mainRecords;
+  delete stats.clinicalRecords;
 }
 
 async function parseZipFromDirectory(directory, stats) {
@@ -210,7 +402,7 @@ async function parseZipFromDirectory(directory, stats) {
     extensions[ext] = (extensions[ext] || 0) + 1;
   }
   console.log(`[ZIP] File extensions:`, JSON.stringify(extensions));
-  
+
   await Promise.all(tasks);
 }
 
@@ -319,6 +511,9 @@ function parseHealthXml(stream, stats, target) {
           sourceVersion: getAttr(node, 'sourceVersion')
         };
 
+        // Always aggregate for dashboard metrics
+        aggregateRecord(stats, record);
+
         if (target === 'main') {
           if (stats.mainRecords.length < LIMITS.MAX_RECORDS) {
             stats.mainRecords.push(record);
@@ -351,6 +546,9 @@ function parseHealthXml(stream, stats, target) {
           totalDistance: getAttr(node, 'totalDistance'),
           totalDistanceUnit: getAttr(node, 'totalDistanceUnit')
         };
+
+        // Always aggregate for dashboard
+        aggregateWorkout(stats, workout);
 
         if (stats.workouts.length < LIMITS.MAX_WORKOUTS) {
           stats.workouts.push(workout);
