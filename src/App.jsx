@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, Heart, Zap, Activity, TrendingUp, Calendar, Sparkles, Navigation } from 'lucide-react';
+import { Heart, Zap, Activity, TrendingUp, Calendar, Sparkles, Navigation, BarChart3, Brain, RotateCcw } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import MetricsCards from './components/MetricsCards';
 import ChartsSection from './components/ChartsSection';
@@ -11,8 +11,6 @@ import PersonalRecords from './components/PersonalRecords';
 import SleepTracking from './components/SleepTracking';
 import StressAnalysis from './components/StressAnalysis';
 import FileUploader from './components/FileUploader';
-import ECGViewer from './components/ECGViewer';
-import WorkoutRoutes from './components/WorkoutRoutes';
 import WorkoutStore from './components/WorkoutStore';
 import HealthAIChat from './components/HealthAIChat';
 import './App.css';
@@ -373,152 +371,137 @@ function App() {
 
   return (
     <div className="app">
-      <header className="app-header">
-        <div className="header-content">
-          <h1>
-            <Heart className="header-icon" />
-            Apple Health Dashboard
-          </h1>
-          <p className="subtitle">Visualize your health data</p>
-        </div>
-      </header>
+      {/* Modern hero / landing when no data */}
+      {!healthData ? (
+        <>
+          <header className="hero-header">
+            <div className="hero-glow" />
+            <div className="hero-content">
+              <div className="hero-badge">Apple Health Portal</div>
+              <h1 className="hero-title">
+                <Heart className="hero-heart" />
+                Your Health,<br /><span>Beautifully Visualized</span>
+              </h1>
+              <p className="hero-subtitle">Upload your Apple Health export and explore interactive dashboards, workout maps, AI insights and more.</p>
+            </div>
+          </header>
 
-      <main className="app-main">
-        {!healthData ? (
-          <div className="upload-section">
-            <FileUploader onDataLoaded={(data) => {
-              setImportedHealthData(data);
-              // Transform server response into dashboard-compatible healthData
-              const dashboardData = {
-                healthRecords: [],
-                workouts: data.workouts || [],
-                workoutRoutes: data.workoutRoutes || [],
-                summary: data.summary || {},
-                metricsByType: data.metricsByType || {},
-                workoutsByDate: data.workoutsByDate || {},
-                allDates: data.allDates || [],
-              };
-              setHealthData(dashboardData);
-              setActiveTab('import');
-            }} />
+          <main className="app-main">
+            <div className="upload-section">
+              <FileUploader onDataLoaded={(data) => {
+                setImportedHealthData(data);
+                const dashboardData = {
+                  healthRecords: [],
+                  workouts: data.workouts || [],
+                  workoutRoutes: data.workoutRoutes || [],
+                  summary: data.summary || {},
+                  metricsByType: data.metricsByType || {},
+                  workoutsByDate: data.workoutsByDate || {},
+                  allDates: data.allDates || [],
+                };
+                setHealthData(dashboardData);
+                setActiveTab('metrics');
+              }} />
 
-            {error && (
-              <div className="error-message">
-                <p>{error}</p>
-              </div>
-            )}
+              {error && (
+                <div className="error-message">
+                  <p>{error}</p>
+                </div>
+              )}
 
-            {loading && (
-              <div className="loading-message">
-                <div className="spinner"></div>
-                <p>Parsing your health data...</p>
-                {progress && <p className="progress-text">{progress}</p>}
-              </div>
-            )}
+              {loading && (
+                <div className="loading-message">
+                  <div className="spinner"></div>
+                  <p>Parsing your health data...</p>
+                  {progress && <p className="progress-text">{progress}</p>}
+                </div>
+              )}
 
-            <div className="info-cards">
-              <div className="info-card">
-                <Heart size={24} />
-                <h3>Heart Rate</h3>
-                <p>Track your daily BPM trends</p>
+              <div className="feature-grid">
+                <div className="feature-card">
+                  <div className="feature-icon heart"><Heart size={24} /></div>
+                  <h3>Heart & Vitals</h3>
+                  <p>Resting HR, HRV, blood pressure and more</p>
+                </div>
+                <div className="feature-card">
+                  <div className="feature-icon activity"><Activity size={24} /></div>
+                  <h3>Activity & Steps</h3>
+                  <p>Daily step counts, flights climbed, move goals</p>
+                </div>
+                <div className="feature-card">
+                  <div className="feature-icon energy"><Zap size={24} /></div>
+                  <h3>Workouts & Maps</h3>
+                  <p>GPS routes, pace charts, elevation profiles</p>
+                </div>
+                <div className="feature-card">
+                  <div className="feature-icon brain"><Brain size={24} /></div>
+                  <h3>AI Insights</h3>
+                  <p>Ask questions about your data with GPT-4</p>
+                </div>
               </div>
-              <div className="info-card">
-                <Activity size={24} />
-                <h3>Steps</h3>
-                <p>Monitor your daily activity</p>
-              </div>
-              <div className="info-card">
-                <Zap size={24} />
-                <h3>Energy</h3>
-                <p>View calorie burn data</p>
-              </div>
-              <div className="info-card">
-                <TrendingUp size={24} />
-                <h3>Trends</h3>
-                <p>See your weekly patterns</p>
+
+              <div className="trust-strip">
+                <span>🔒 100 % local processing</span>
+                <span>📱 Works with any Apple Health export</span>
+                <span>🚫 No data stored on servers</span>
               </div>
             </div>
-          </div>
+          </main>
+        </>
         ) : (
-          <div className="dashboard-section">
-            <div className="dashboard-header">
-              <h2>Your Health Metrics</h2>
+          <>
+          {/* Compact top bar when dashboard is loaded */}
+          <header className="dash-header">
+            <div className="dash-header-inner">
+              <div className="dash-brand">
+                <Heart size={22} className="dash-heart" />
+                <span>Health Portal</span>
+              </div>
               <button
-                className="reset-button"
+                className="reload-btn"
                 onClick={() => {
                   setHealthData(null);
+                  setImportedHealthData(null);
                   fileInputRef.current = null;
                 }}
               >
+                <RotateCcw size={16} />
                 Load Different File
               </button>
             </div>
+          </header>
 
-            {/* Tab Navigation */}
-            {healthData && (
-              <div className="tab-navigation">
-                <button
-                  className={`tab-button ${activeTab === 'metrics' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('metrics')}
-                >
-                  <TrendingUp size={18} />
-                  Overview
+          <main className="app-main">
+          <div className="dashboard-section">
+
+            {/* Pill-style Tab Navigation */}
+            <nav className="tab-bar">
+              <button className={`pill ${activeTab === 'metrics' ? 'active' : ''}`} onClick={() => setActiveTab('metrics')}>
+                <TrendingUp size={16} /> Overview
+              </button>
+              {healthData.workouts?.length > 0 && (
+                <button className={`pill ${activeTab === 'workouts' ? 'active' : ''}`} onClick={() => setActiveTab('workouts')}>
+                  <Navigation size={16} /> Workouts
                 </button>
-                {healthData.workouts && healthData.workouts.length > 0 && (
-                  <button
-                    className={`tab-button ${activeTab === 'workouts' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('workouts')}
-                  >
-                    <Navigation size={18} />
-                    Workouts & Maps
-                  </button>
-                )}
-                {healthData.workoutsByDate && Object.keys(healthData.workoutsByDate).length > 0 && (
-                  <button
-                    className={`tab-button ${activeTab === 'runs' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('runs')}
-                  >
-                    <Activity size={18} />
-                    Runs & Workouts
-                  </button>
-                )}
-                <button
-                  className={`tab-button ${activeTab === 'charts' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('charts')}
-                >
-                  <TrendingUp size={18} />
-                  Charts
+              )}
+              {healthData.workoutsByDate && Object.keys(healthData.workoutsByDate).length > 0 && (
+                <button className={`pill ${activeTab === 'runs' ? 'active' : ''}`} onClick={() => setActiveTab('runs')}>
+                  <Activity size={16} /> Runs
                 </button>
-                <button
-                  className={`tab-button ${activeTab === 'details' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('details')}
-                >
-                  <Calendar size={18} />
-                  Details
-                </button>
-                <button
-                  className={`tab-button ${activeTab === 'analytics' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('analytics')}
-                >
-                  <Sparkles size={18} />
-                  Analytics & AI
-                </button>
-                <button
-                  className={`tab-button ${activeTab === 'ai-chat' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('ai-chat')}
-                >
-                  <Sparkles size={18} />
-                  AI Chat
-                </button>
-                <button
-                  className={`tab-button ${activeTab === 'import' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('import')}
-                >
-                  <Upload size={18} />
-                  Import Apple Health
-                </button>
-              </div>
-            )}
+              )}
+              <button className={`pill ${activeTab === 'charts' ? 'active' : ''}`} onClick={() => setActiveTab('charts')}>
+                <BarChart3 size={16} /> Charts
+              </button>
+              <button className={`pill ${activeTab === 'details' ? 'active' : ''}`} onClick={() => setActiveTab('details')}>
+                <Calendar size={16} /> Details
+              </button>
+              <button className={`pill ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}>
+                <Sparkles size={16} /> Analytics
+              </button>
+              <button className={`pill ${activeTab === 'ai-chat' ? 'active' : ''}`} onClick={() => setActiveTab('ai-chat')}>
+                <Brain size={16} /> AI Chat
+              </button>
+            </nav>
 
             {/* Tab Content */}
             {healthData && (
@@ -567,46 +550,15 @@ function App() {
                 {activeTab === 'ai-chat' && (
                   <HealthAIChat healthData={healthData} importedHealthData={importedHealthData} />
                 )}
-                {activeTab === 'import' && (
-                  <div className="import-section">
-                    <FileUploader onDataLoaded={setImportedHealthData} />
-                    {importedHealthData && (
-                      <>
-                        <div className="import-summary">
-                          <h3>Imported Data Summary</h3>
-                          <div className="summary-stats">
-                            <div className="summary-stat">
-                              <span>Records:</span>
-                              <strong>{importedHealthData.totalRecords}</strong>
-                            </div>
-                            <div className="summary-stat">
-                              <span>Workouts:</span>
-                              <strong>{importedHealthData.totalWorkouts}</strong>
-                            </div>
-                            <div className="summary-stat">
-                              <span>ECGs:</span>
-                              <strong>{importedHealthData.totalECGs}</strong>
-                            </div>
-                          </div>
-                        </div>
-                        {importedHealthData.ecgs && importedHealthData.ecgs.length > 0 && (
-                          <ECGViewer ecgData={importedHealthData.ecgs} />
-                        )}
-                        {importedHealthData.workouts && importedHealthData.workouts.length > 0 && (
-                          <WorkoutRoutes workouts={importedHealthData.workouts} routes={importedHealthData.routes || []} />
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
               </>
             )}
           </div>
+          </main>
+          </>
         )}
-      </main>
 
       <footer className="app-footer">
-        <p>Apple Health Portal • Local Data Only • No Data Stored</p>
+        <p>Apple Health Portal &middot; 100% local &middot; No data stored</p>
       </footer>
     </div>
   );

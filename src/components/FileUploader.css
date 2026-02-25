@@ -1,96 +1,88 @@
+/* FileUploader — modern glassmorphism upload box */
 .file-uploader {
-  padding: 20px;
-  margin-bottom: 30px;
+  margin-bottom: 1rem;
 }
 
 .upload-box {
-  border: 2px dashed #3b82f6;
-  border-radius: 12px;
-  padding: 40px;
+  position: relative;
+  border: 2px dashed rgba(0,0,0,.12);
+  border-radius: 20px;
+  padding: 3rem 2rem;
   text-align: center;
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(59, 130, 246, 0.02));
-  transition: all 0.3s ease;
+  background: rgba(255,255,255,.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: all .3s ease;
 }
-
 .upload-box:hover {
-  border-color: #2563eb;
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.05));
+  border-color: #FF3B30;
+  background: rgba(255,59,48,.04);
+  box-shadow: 0 8px 32px rgba(255,59,48,.10);
 }
 
 .upload-label {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   cursor: pointer;
-  color: #1f2937;
+  color: #1C1C1E;
+}
+
+.upload-label svg {
+  color: #FF3B30;
+  transition: transform .25s;
+}
+.upload-label:hover svg {
+  transform: scale(1.12) translateY(-2px);
 }
 
 .upload-label h3 {
   margin: 0;
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 1.15rem;
+  font-weight: 700;
 }
-
 .upload-label p {
   margin: 0;
-  color: #6b7280;
-  font-size: 14px;
+  color: #8E8E93;
+  font-size: .88rem;
 }
 
-.upload-label svg {
-  color: #3b82f6;
-  transition: transform 0.2s;
-}
+.file-input { display: none; }
 
-.upload-label:hover svg {
-  transform: scale(1.1);
-}
-
-.file-input {
-  display: none;
-}
-
+/* Status messages */
 .status-message {
-  margin-top: 16px;
-  padding: 16px;
-  border-radius: 8px;
+  margin-top: 14px;
+  padding: 14px 18px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 14px;
+  gap: 10px;
+  font-size: .88rem;
+  font-weight: 500;
 }
-
 .status-message.loading {
-  background: #dbeafe;
-  color: #0c4a6e;
-  border: 1px solid #93c5fd;
+  background: rgba(0,122,255,.08);
+  color: #0055B3;
+  border: 1px solid rgba(0,122,255,.15);
 }
-
 .status-message.error {
-  background: #fee2e2;
-  color: #7f1d1d;
-  border: 1px solid #fca5a5;
+  background: rgba(255,59,48,.08);
+  color: #CC2D26;
+  border: 1px solid rgba(255,59,48,.15);
 }
-
 .status-message.success {
-  background: #dcfce7;
-  color: #166534;
-  border: 1px solid #86efac;
+  background: rgba(52,199,89,.08);
+  color: #1D7A3C;
+  border: 1px solid rgba(52,199,89,.15);
 }
 
-.spinner {
+.file-uploader .spinner {
   display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(0, 0, 0, 0.1);
+  width: 16px; height: 16px;
+  border: 2px solid rgba(0,0,0,.08);
   border-radius: 50%;
   border-top-color: currentColor;
-  animation: spin 0.6s linear infinite;
+  animation: fu-spin .6s linear infinite;
 }
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
+@keyframes fu-spin { to { transform: rotate(360deg); } }
