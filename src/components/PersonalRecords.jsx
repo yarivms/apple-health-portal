@@ -3,7 +3,7 @@ import { Moon, Eye, Award, Target } from 'lucide-react';
 import './PersonalRecords.css';
 
 function PersonalRecords({ data }) {
-  const { metricsByType, workoutsByDate, allDates } = data;
+  const { metricsByType, workoutsByDate, allDates, workouts } = data;
 
   const getPersonalRecords = () => {
     const records = {
@@ -16,14 +16,27 @@ function PersonalRecords({ data }) {
       streak: 0,
     };
 
-    // Longest run
-    if (metricsByType?.HKQuantityTypeIdentifierDistanceWalkingRunning?.max) {
-      records.longestRun = (metricsByType.HKQuantityTypeIdentifierDistanceWalkingRunning.max / 1000).toFixed(2);
+    // Longest run — use workout data for accurate single-session distance
+    if (data.workouts && data.workouts.length > 0) {
+      const runs = data.workouts.filter(w => w.workoutActivityType === 'HKWorkoutActivityTypeRunning');
+      let maxDist = 0;
+      for (const r of runs) {
+        let d = parseFloat(r.totalDistance) || 0;
+        if (r.totalDistanceUnit === 'm') d /= 1000;
+        if (d > maxDist) maxDist = d;
+      }
+      if (maxDist > 0) records.longestRun = maxDist.toFixed(2);
+    }
+    // Fallback to metric data
+    if (records.longestRun === 0 && metricsByType?.HKQuantityTypeIdentifierDistanceWalkingRunning?.max) {
+      records.longestRun = metricsByType.HKQuantityTypeIdentifierDistanceWalkingRunning.max.toFixed(2);
     }
 
-    // Fastest speed
-    if (metricsByType?.HKQuantityTypeIdentifierSpeed?.max) {
-      records.fastestSpeed = metricsByType.HKQuantityTypeIdentifierSpeed.max.toFixed(1);
+    // Fastest speed (running speed or walking speed)
+    if (metricsByType?.HKQuantityTypeIdentifierRunningSpeed?.max) {
+      records.fastestSpeed = metricsByType.HKQuantityTypeIdentifierRunningSpeed.max.toFixed(1);
+    } else if (metricsByType?.HKQuantityTypeIdentifierWalkingSpeed?.max) {
+      records.fastestSpeed = metricsByType.HKQuantityTypeIdentifierWalkingSpeed.max.toFixed(1);
     }
 
     // Max heart rate
@@ -36,9 +49,11 @@ function PersonalRecords({ data }) {
       records.restingHeartRate = Math.round(metricsByType.HKQuantityTypeIdentifierHeartRate.min);
     }
 
-    // Max calories in a single session
-    if (metricsByType?.HKQuantityTypeIdentifierEnergyBurned?.max) {
-      records.maxCalories = Math.round(metricsByType.HKQuantityTypeIdentifierEnergyBurned.max);
+    // Max calories — try ActiveEnergyBurned first, then BasalEnergyBurned
+    if (metricsByType?.HKQuantityTypeIdentifierActiveEnergyBurned?.max) {
+      records.maxCalories = Math.round(metricsByType.HKQuantityTypeIdentifierActiveEnergyBurned.max);
+    } else if (metricsByType?.HKQuantityTypeIdentifierBasalEnergyBurned?.max) {
+      records.maxCalories = Math.round(metricsByType.HKQuantityTypeIdentifierBasalEnergyBurned.max);
     }
 
     // Streak
@@ -74,7 +89,7 @@ function PersonalRecords({ data }) {
     {
       icon: Award,
       label: 'Fastest Speed',
-      value: records.fastestSpeed > 0 ? `${records.fastestSpeed}` : 'N/A',
+      value: records.fastestSpeed > 0 ? `${records.fastestSpeed} km/h` : 'N/A',
       unit: 'speed',
       color: '#f59e0b',
     },

@@ -30,6 +30,7 @@ function ChartsSection({ data }) {
   };
 
   const [selectedMetrics, setSelectedMetrics] = useState([]);
+  const [metricFilter, setMetricFilter] = useState('');
 
   // Initialize selected metrics when data loads
   useEffect(() => {
@@ -47,12 +48,9 @@ function ChartsSection({ data }) {
 
     // Collect data from selected metrics
     selectedMetrics.forEach(metricName => {
-      const metrics = Object.entries(metricsByType).find(([key]) => 
-        key.toLowerCase().includes(metricName.toLowerCase())
-      );
+      const metricData = metricsByType[metricName];
       
-      if (metrics) {
-        const [metricType, metricData] = metrics;
+      if (metricData) {
         metricData.values?.forEach(val => {
           if (!chartData[val.date]) {
             chartData[val.date] = { date: val.date };
@@ -123,8 +121,17 @@ function ChartsSection({ data }) {
           {availableMetrics.length > 0 && (
             <div className="metric-selector">
               <label>Select Metrics:</label>
+              <input
+                type="text"
+                placeholder="Search metrics..."
+                value={metricFilter}
+                onChange={(e) => setMetricFilter(e.target.value)}
+                className="metric-search"
+              />
               <div className="metric-checkboxes">
-                {availableMetrics.slice(0, 8).map((metric) => (
+                {availableMetrics
+                  .filter(m => !metricFilter || shortName(m).toLowerCase().includes(metricFilter.toLowerCase()))
+                  .map((metric) => (
                   <label key={metric} className="checkbox-label">
                     <input
                       type="checkbox"
@@ -137,7 +144,7 @@ function ChartsSection({ data }) {
                         }
                       }}
                     />
-                    <span className="metric-label">{metric.replace(/HKQuantityTypeIdentifier/g, '')}</span>
+                    <span className="metric-label">{shortName(metric)}</span>
                   </label>
                 ))}
               </div>
@@ -241,9 +248,9 @@ function ChartsSection({ data }) {
         )}
       </div>
 
-      {availableMetrics.length > 8 && (
+      {availableMetrics.length > 8 && !metricFilter && (
         <div className="data-info">
-          <p>✓ Showing top 8 of {availableMetrics.length} available metrics</p>
+          <p>✓ {availableMetrics.length} metrics available — use the search box to find specific ones</p>
         </div>
       )}
     </div>

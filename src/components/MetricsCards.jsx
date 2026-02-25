@@ -18,7 +18,7 @@ function MetricsCards({ data }) {
       id: 'metrics',
       icon: BarChart3,
       title: 'Metric Types',
-      stat: summary.metricsAvailable?.length || 0,
+      stat: summary.metricsAvailable?.length || Object.keys(data.metricsByType || {}).length || 0,
       unit: 'types',
       color: '#3b82f6',
     },
