@@ -455,8 +455,9 @@ async function parseZipFromDirectory(directory, stats) {
       console.log(`[ZIP] Found ECG GPX: ${path}`);
       tasks.push(parseEcgXml(file.stream(), stats, path));
     } else if (isRouteFile(path)) {
-      console.log(`[ZIP] Found route file: ${path}`);
-      tasks.push(parseRouteFile(file.stream(), stats, path));
+      tasks.push(
+        file.buffer().then(buf => parseRouteFromBuffer(buf, stats, path))
+      );
     }
   }
   
@@ -860,6 +861,60 @@ function parseEcgCsv(stream, stats, filename) {
   });
 }
 
+function parseRouteFromBuffer(buffer, stats, filename) {
+  const parser = new SaxesParser({ xmlns: false });
+  const route = {
+    filename,
+    points: [],
+    pointCount: 0,
+    truncated: false
+  };
+
+  parser.on('error', (err) => {
+    stats.warnings.push(`Route XML parse error (${filename}): ${err.message}`);
+    parser.error = null;
+    parser.resume();
+  });
+
+  let currentTag = null;
+  parser.on('opentag', (node) => {
+    if (node.name === 'trkpt') {
+      route.pointCount += 1;
+      if (route.points.length < LIMITS.MAX_ROUTE_POINTS) {
+        route.points.push({
+          lat: toNumber(getAttr(node, 'lat')),
+          lon: toNumber(getAttr(node, 'lon')),
+          elevation: null,
+          time: null,
+          speed: null
+        });
+      } else {
+        route.truncated = true;
+        stats.routesTruncated = true;
+      }
+    } else if (node.name === 'ele' || node.name === 'time' || node.name === 'speed') {
+      currentTag = node.name;
+    }
+  });
+
+  parser.on('text', (text) => {
+    if (!currentTag || route.points.length === 0) return;
+    const point = route.points[route.points.length - 1];
+    if (currentTag === 'ele') point.elevation = text;
+    if (currentTag === 'time') point.time = text;
+    if (currentTag === 'speed') point.speed = text;
+  });
+
+  parser.on('closetag', (tag) => {
+    const tagName = typeof tag === 'object' ? tag.name : tag;
+    if (tagName === currentTag) currentTag = null;
+  });
+
+  parser.write(buffer.toString('utf8'));
+  parser.close();
+  stats.workoutRoutes.push(route);
+}
+
 function parseRouteFile(stream, stats, filename) {
   return new Promise((resolve, reject) => {
     const parser = new SaxesParser({ xmlns: false });
@@ -876,28 +931,23 @@ function parseRouteFile(stream, stats, filename) {
       parser.resume();
     });
 
-    parser.on('opentag', (node) => {
-      if (node.name !== 'trkpt') return;
-
-      route.pointCount += 1;
-      if (route.points.length >= LIMITS.MAX_ROUTE_POINTS) {
-        route.truncated = true;
-        stats.routesTruncated = true;
-        return;
-      }
-
-      route.points.push({
-        lat: toNumber(getAttr(node, 'lat')),
-        lon: toNumber(getAttr(node, 'lon')),
-        elevation: null,
-        time: null,
-        speed: null
-      });
-    });
-
     let currentTag = null;
     parser.on('opentag', (node) => {
-      if (node.name === 'ele' || node.name === 'time' || node.name === 'speed') {
+      if (node.name === 'trkpt') {
+        route.pointCount += 1;
+        if (route.points.length < LIMITS.MAX_ROUTE_POINTS) {
+          route.points.push({
+            lat: toNumber(getAttr(node, 'lat')),
+            lon: toNumber(getAttr(node, 'lon')),
+            elevation: null,
+            time: null,
+            speed: null
+          });
+        } else {
+          route.truncated = true;
+          stats.routesTruncated = true;
+        }
+      } else if (node.name === 'ele' || node.name === 'time' || node.name === 'speed') {
         currentTag = node.name;
       }
     });
