@@ -11,7 +11,8 @@ const LIMITS = {
   MAX_RECORDS: 50000,
   MAX_WORKOUTS: 50000,
   MAX_ROUTE_POINTS: 20000,
-  MAX_ECG_SAMPLES: 10000
+  MAX_ECG_SAMPLES: 10000,
+  MAX_ECGS: 500
 };
 
 const app = express();
@@ -181,6 +182,9 @@ async function parseZipFromDirectory(directory, stats) {
     } else if (isEcgXml(path)) {
       console.log(`[ZIP] Found ECG XML: ${path}`);
       tasks.push(parseEcgXml(file.stream(), stats, path));
+    } else if (isEcgCsv(path)) {
+      console.log(`[ZIP] Found ECG CSV: ${path}`);
+      tasks.push(parseEcgCsv(file.stream(), stats, path));
     } else if (isRouteFile(path)) {
       console.log(`[ZIP] Found route file: ${path}`);
       tasks.push(parseRouteFile(file.stream(), stats, path));
@@ -234,6 +238,12 @@ function parseZipStream(stream, stats) {
         return;
       }
 
+      if (isEcgCsv(path)) {
+        console.log(`[ZIP] Found ECG CSV: ${path}`);
+        tasks.push(parseEcgCsv(entry, stats, path));
+        return;
+      }
+
       if (isRouteFile(path)) {
         console.log(`[ZIP] Found route file: ${path}`);
         tasks.push(parseRouteFile(entry, stats, path));
@@ -263,6 +273,8 @@ function parseHealthXml(stream, stats, target) {
     const parser = new SaxesParser({ xmlns: false });
     let recordCount = 0;
     let workoutCount = 0;
+    let ecgCount = 0;
+    let currentEcg = null; // tracks the <Electrocardiogram> we're inside
 
     parser.on('error', (err) => {
       stats.warnings.push(`${target} XML parse error: ${err.message}`);
@@ -326,6 +338,46 @@ function parseHealthXml(stream, stats, target) {
           stats.workoutsTruncated = true;
         }
       }
+
+      // Handle <Electrocardiogram> elements — ECG metadata
+      if (node.name === 'Electrocardiogram') {
+        ecgCount += 1;
+        if (ecgCount % 100 === 0) {
+          console.log(`[XML] ${target}: Processed ${ecgCount} ECGs...`);
+        }
+        currentEcg = {
+          filename: 'export.xml',
+          timestamp: getAttr(node, 'startDate') || getAttr(node, 'endDate'),
+          heartRate: getAttr(node, 'averageHeartRate'),
+          classification: getAttr(node, 'classification'),
+          sampleRate: getAttr(node, 'samplingFrequency'),
+          sampleCount: 0,
+          samples: []
+        };
+      }
+
+      // Handle <VoltageMeasurement> elements — ECG waveform samples
+      if (node.name === 'VoltageMeasurement' && currentEcg) {
+        currentEcg.sampleCount += 1;
+        if (currentEcg.samples.length < LIMITS.MAX_ECG_SAMPLES) {
+          currentEcg.samples.push({
+            value: getAttr(node, 'value'),
+            time: getAttr(node, 'time'),
+            lead: getAttr(node, 'lead')
+          });
+        } else {
+          stats.ecgSamplesTruncated = true;
+        }
+      }
+    });
+
+    parser.on('closetag', (name) => {
+      if (name === 'Electrocardiogram' && currentEcg) {
+        if (stats.ecgs.length < LIMITS.MAX_ECGS) {
+          stats.ecgs.push(currentEcg);
+        }
+        currentEcg = null;
+      }
     });
 
     stream.on('data', (chunk) => {
@@ -334,7 +386,7 @@ function parseHealthXml(stream, stats, target) {
 
     stream.on('end', () => {
       parser.close();
-      console.log(`[XML] ${target} XML parsing complete: ${recordCount} records, ${workoutCount} workouts`);
+      console.log(`[XML] ${target} XML parsing complete: ${recordCount} records, ${workoutCount} workouts, ${ecgCount} ECGs`);
       resolve();
     });
 
@@ -351,7 +403,8 @@ function parseEcgXml(stream, stats, filename) {
       heartRate: null,
       classification: null,
       sampleRate: null,
-      sampleCount: 0
+      sampleCount: 0,
+      samples: []
     };
 
     parser.on('error', (err) => {
@@ -366,15 +419,21 @@ function parseEcgXml(stream, stats, filename) {
         node.name === 'Electrocardiogram' ||
         node.name === 'ECG'
       ) {
-        ecg.timestamp = ecg.timestamp || getAttr(node, 'timestamp') || getAttr(node, 'recordingDate');
-        ecg.heartRate = ecg.heartRate || getAttr(node, 'heartRate') || getAttr(node, 'hr');
+        ecg.timestamp = ecg.timestamp || getAttr(node, 'timestamp') || getAttr(node, 'recordingDate') || getAttr(node, 'startDate');
+        ecg.heartRate = ecg.heartRate || getAttr(node, 'heartRate') || getAttr(node, 'hr') || getAttr(node, 'averageHeartRate');
         ecg.classification = ecg.classification || getAttr(node, 'classification');
-        ecg.sampleRate = ecg.sampleRate || getAttr(node, 'sampleRate');
+        ecg.sampleRate = ecg.sampleRate || getAttr(node, 'sampleRate') || getAttr(node, 'samplingFrequency');
       }
 
-      if (node.name === 'Sample') {
+      if (node.name === 'Sample' || node.name === 'VoltageMeasurement') {
         ecg.sampleCount += 1;
-        if (ecg.sampleCount > LIMITS.MAX_ECG_SAMPLES) {
+        if (ecg.samples.length < LIMITS.MAX_ECG_SAMPLES) {
+          ecg.samples.push({
+            value: getAttr(node, 'value'),
+            time: getAttr(node, 'time'),
+            lead: getAttr(node, 'lead')
+          });
+        } else {
           stats.ecgSamplesTruncated = true;
         }
       }
@@ -386,11 +445,98 @@ function parseEcgXml(stream, stats, filename) {
 
     stream.on('end', () => {
       parser.close();
-      stats.ecgs.push(ecg);
+      if (stats.ecgs.length < LIMITS.MAX_ECGS) {
+        stats.ecgs.push(ecg);
+      }
       resolve();
     });
 
     stream.on('error', reject);
+  });
+}
+
+function parseEcgCsv(stream, stats, filename) {
+  return new Promise((resolve, reject) => {
+    const ecg = {
+      filename,
+      timestamp: null,
+      heartRate: null,
+      classification: null,
+      sampleRate: null,
+      sampleCount: 0,
+      samples: []
+    };
+
+    // Try to extract timestamp from filename like ecg_2024-01-15.csv
+    const dateMatch = filename.match(/(\d{4}[-_]\d{2}[-_]\d{2})/);
+    if (dateMatch) {
+      ecg.timestamp = dateMatch[1].replace(/_/g, '-');
+    }
+
+    let buffer = '';
+    let headerParsed = false;
+    let valueIndex = -1;
+    let timeIndex = -1;
+
+    stream.on('data', (chunk) => {
+      buffer += chunk.toString('utf8');
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // keep last partial line
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        if (!headerParsed) {
+          // Parse header row
+          const headers = trimmed.split(',').map(h => h.trim().toLowerCase());
+          valueIndex = headers.findIndex(h => h.includes('voltage') || h === 'value' || h === 'microvolts');
+          timeIndex = headers.findIndex(h => h === 'time' || h === 'elapsed time' || h.includes('second'));
+          if (valueIndex === -1) valueIndex = 0; // fallback to first column
+          headerParsed = true;
+          continue;
+        }
+
+        const cols = trimmed.split(',');
+        ecg.sampleCount += 1;
+        if (ecg.samples.length < LIMITS.MAX_ECG_SAMPLES) {
+          ecg.samples.push({
+            value: cols[valueIndex]?.trim() || null,
+            time: timeIndex >= 0 ? cols[timeIndex]?.trim() || null : null,
+            lead: null
+          });
+        } else {
+          stats.ecgSamplesTruncated = true;
+        }
+      }
+    });
+
+    stream.on('end', () => {
+      // Process remaining buffer
+      if (buffer.trim() && headerParsed) {
+        const cols = buffer.trim().split(',');
+        ecg.sampleCount += 1;
+        if (ecg.samples.length < LIMITS.MAX_ECG_SAMPLES) {
+          ecg.samples.push({
+            value: cols[valueIndex]?.trim() || null,
+            time: timeIndex >= 0 ? cols[timeIndex]?.trim() || null : null,
+            lead: null
+          });
+        }
+      }
+
+      console.log(`[ECG CSV] Parsed ${filename}: ${ecg.sampleCount} samples`);
+      if (stats.ecgs.length < LIMITS.MAX_ECGS) {
+        stats.ecgs.push(ecg);
+      }
+      resolve();
+    });
+
+    stream.on('error', (err) => {
+      stats.warnings.push(`ECG CSV parse error (${filename}): ${err.message}`);
+      resolve(); // don't reject, just warn
+    });
   });
 }
 
@@ -494,6 +640,11 @@ function isCdaXml(path) {
 function isEcgXml(path) {
   const lower = path.toLowerCase();
   return lower.includes('electro') && lower.endsWith('.xml');
+}
+
+function isEcgCsv(path) {
+  const lower = path.toLowerCase();
+  return lower.includes('electrocardiogram') && lower.endsWith('.csv');
 }
 
 function isRouteFile(path) {
