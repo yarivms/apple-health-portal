@@ -484,7 +484,7 @@ function App() {
                   <Navigation size={16} /> Workouts
                 </button>
               )}
-              {healthData.workoutsByDate && Object.keys(healthData.workoutsByDate).length > 0 && (
+                {healthData.workouts?.length > 0 && (
                 <button className={`pill ${activeTab === 'runs' ? 'active' : ''}`} onClick={() => setActiveTab('runs')}>
                   <Activity size={16} /> Runs
                 </button>
@@ -518,8 +518,8 @@ function App() {
                     metricsByType={healthData.metricsByType}
                   />
                 )}
-                {activeTab === 'runs' && healthData.workoutsByDate && Object.keys(healthData.workoutsByDate).length > 0 && (
-                  <RunsView data={healthData} />
+                {activeTab === 'runs' && healthData.workouts?.length > 0 && (
+                  <RunsView workouts={healthData.workouts} workoutRoutes={healthData.workoutRoutes || []} />
                 )}
                 {activeTab === 'charts' && (
                   <ChartsSection data={healthData} />
