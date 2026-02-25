@@ -39,12 +39,14 @@ function formatDuration(seconds) {
   return `${sec}s`;
 }
 
-function formatDistance(meters, unit) {
-  const d = parseFloat(meters);
+function formatDistance(distValue, unit) {
+  const d = parseFloat(distValue);
   if (!d || isNaN(d)) return null;
-  if (unit?.toLowerCase().includes('mi')) return { value: d.toFixed(2), unit: 'mi' };
-  if (d > 1000 || unit?.toLowerCase().includes('km')) return { value: (d > 100 ? d : d * 1000 / 1000).toFixed(2), unit: 'km' };
-  return { value: d.toFixed(2), unit: unit || 'km' };
+  // Apple Health totalDistanceUnit is usually "km" or "mi"
+  const u = (unit || '').toLowerCase();
+  if (u.includes('mi')) return { value: d.toFixed(2), unit: 'mi' };
+  // Default: value is in km
+  return { value: d.toFixed(2), unit: 'km' };
 }
 
 function formatPace(durationSec, distKm) {
@@ -64,9 +66,12 @@ function formatCalories(val, unit) {
 function parseAppleDate(dateStr) {
   if (!dateStr) return null;
   // "2024-09-08 07:12:58 +0200"
-  const m = dateStr.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/);
+  const m = dateStr.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})\s*([+-]\d{4})?/);
   if (!m) return new Date(dateStr);
-  return new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}`);
+  const tz = m[7] || '';
+  // Format timezone as +HH:MM for ISO 8601
+  const tzFormatted = tz ? `${tz.slice(0, 3)}:${tz.slice(3)}` : '';
+  return new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}${tzFormatted}`);
 }
 
 function matchRouteToWorkout(workout, routes) {
@@ -291,7 +296,24 @@ export default function WorkoutStore({ workouts, workoutRoutes, metricsByType })
       const info = activityInfo(w.workoutActivityType);
       const startDate = parseAppleDate(w.startDate);
       const endDate = parseAppleDate(w.endDate);
-      const durationSec = parseFloat(w.duration) || (startDate && endDate ? (endDate - startDate) / 1000 : 0);
+      // Apple Health duration is in the unit specified by durationUnit (usually "min")
+      const rawDuration = parseFloat(w.duration) || 0;
+      const durationUnit = (w.durationUnit || '').toLowerCase();
+      let durationSec;
+      if (durationUnit.includes('min')) {
+        durationSec = rawDuration * 60;
+      } else if (durationUnit.includes('hr') || durationUnit.includes('hour')) {
+        durationSec = rawDuration * 3600;
+      } else if (durationUnit.includes('sec') || durationUnit === 's') {
+        durationSec = rawDuration;
+      } else {
+        // Fallback: if value > 300 it's probably seconds, otherwise minutes
+        durationSec = rawDuration > 300 ? rawDuration : rawDuration * 60;
+      }
+      // If raw duration was 0, try computing from timestamps
+      if (!durationSec && startDate && endDate) {
+        durationSec = (endDate - startDate) / 1000;
+      }
       const dist = formatDistance(w.totalDistance, w.totalDistanceUnit);
       const distKm = dist ? parseFloat(dist.value) * (dist.unit === 'mi' ? 1.609 : 1) : 0;
       const pace = formatPace(durationSec, distKm);

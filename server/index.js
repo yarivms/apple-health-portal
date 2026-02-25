@@ -99,6 +99,26 @@ app.post('/api/parse', (req, res) => {
         finalizeStats(stats);
         console.log(`[API] Parse complete: ${stats.totalRecords} records, ${stats.totalWorkouts} workouts, ${stats.totalECGs} ECGs, ${stats.totalRoutes} routes`);
         console.log(`[API] Warnings: ${stats.warnings.length}`, stats.warnings.slice(0, 10));
+
+        // Debug: sample workout data
+        if (stats.workouts.length > 0) {
+          const sample = stats.workouts.slice(0, 3);
+          console.log('[DEBUG] Sample workouts:', JSON.stringify(sample, null, 2));
+          // Find running workouts specifically
+          const runs = stats.workouts.filter(w => w.workoutActivityType === 'HKWorkoutActivityTypeRunning');
+          console.log(`[DEBUG] Running workouts: ${runs.length}`);
+          if (runs.length > 0) {
+            const longest = runs.reduce((a, b) => (parseFloat(a.totalDistance) || 0) > (parseFloat(b.totalDistance) || 0) ? a : b);
+            console.log('[DEBUG] Longest run:', JSON.stringify(longest, null, 2));
+          }
+        }
+
+        // Debug: measure response size
+        const totalRoutePoints = stats.workoutRoutes.reduce((s, r) => s + (r.points?.length || 0), 0);
+        console.log(`[DEBUG] Total route points: ${totalRoutePoints}`);
+        const jsonStr = JSON.stringify(stats);
+        console.log(`[DEBUG] Response JSON size: ${(jsonStr.length / 1024 / 1024).toFixed(2)} MB`);
+
         sendOnce(200, stats);
       } catch (err) {
         console.error('[API] Parse error:', err.message);
@@ -345,6 +365,25 @@ function finalizeStats(stats) {
   // Drop the huge raw arrays — dashboard uses metricsByType etc.
   delete stats.mainRecords;
   delete stats.clinicalRecords;
+
+  // Downsample route points to keep response payload manageable
+  // Target: max 500 points per route (enough for smooth maps + charts)
+  const MAX_DISPLAY_POINTS = 500;
+  for (const route of stats.workoutRoutes) {
+    if (route.points && route.points.length > MAX_DISPLAY_POINTS) {
+      const original = route.points;
+      const step = original.length / MAX_DISPLAY_POINTS;
+      const sampled = [];
+      for (let i = 0; i < MAX_DISPLAY_POINTS; i++) {
+        sampled.push(original[Math.floor(i * step)]);
+      }
+      // Always include first and last point
+      sampled[0] = original[0];
+      sampled[sampled.length - 1] = original[original.length - 1];
+      route.fullPointCount = original.length;
+      route.points = sampled;
+    }
+  }
 }
 
 async function parseZipFromDirectory(directory, stats) {
