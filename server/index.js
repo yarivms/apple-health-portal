@@ -185,17 +185,31 @@ async function parseZipFromDirectory(directory, stats) {
     } else if (isEcgCsv(path)) {
       console.log(`[ZIP] Found ECG CSV: ${path}`);
       tasks.push(parseEcgCsv(file.stream(), stats, path));
+    } else if (isEcgGpx(path)) {
+      console.log(`[ZIP] Found ECG GPX: ${path}`);
+      tasks.push(parseEcgXml(file.stream(), stats, path));
     } else if (isRouteFile(path)) {
       console.log(`[ZIP] Found route file: ${path}`);
       tasks.push(parseRouteFile(file.stream(), stats, path));
     }
   }
   
-  // Debug: log all files that don't match any pattern
-  console.log(`[ZIP] All ${allPaths.length} files in ZIP:`);
-  for (const p of allPaths.slice(0, 50)) {
-    console.log(`  - ${p}`);
+  // Debug: log ECG-related files and unmatched files
+  const ecgRelated = allPaths.filter(p => {
+    const l = p.toLowerCase();
+    return l.includes('electro') || l.includes('ecg');
+  });
+  console.log(`[ZIP] Total files: ${allPaths.length}, ECG-related files: ${ecgRelated.length}`);
+  for (const p of ecgRelated) {
+    console.log(`  [ECG FILE] ${p}`);
   }
+  // Show a sample of all file extensions
+  const extensions = {};
+  for (const p of allPaths) {
+    const ext = p.split('.').pop()?.toLowerCase() || 'none';
+    extensions[ext] = (extensions[ext] || 0) + 1;
+  }
+  console.log(`[ZIP] File extensions:`, JSON.stringify(extensions));
   
   await Promise.all(tasks);
 }
@@ -241,6 +255,12 @@ function parseZipStream(stream, stats) {
       if (isEcgCsv(path)) {
         console.log(`[ZIP] Found ECG CSV: ${path}`);
         tasks.push(parseEcgCsv(entry, stats, path));
+        return;
+      }
+
+      if (isEcgGpx(path)) {
+        console.log(`[ZIP] Found ECG GPX: ${path}`);
+        tasks.push(parseEcgXml(entry, stats, path));
         return;
       }
 
@@ -639,12 +659,17 @@ function isCdaXml(path) {
 
 function isEcgXml(path) {
   const lower = path.toLowerCase();
-  return lower.includes('electro') && lower.endsWith('.xml');
+  return lower.includes('electro') && lower.endsWith('.xml') && !lower.endsWith('export.xml') && !lower.includes('cda');
 }
 
 function isEcgCsv(path) {
   const lower = path.toLowerCase();
-  return lower.includes('electrocardiogram') && lower.endsWith('.csv');
+  return (lower.includes('electrocardiogram') || lower.includes('ecg')) && lower.endsWith('.csv');
+}
+
+function isEcgGpx(path) {
+  const lower = path.toLowerCase();
+  return lower.includes('electro') && lower.endsWith('.gpx');
 }
 
 function isRouteFile(path) {
