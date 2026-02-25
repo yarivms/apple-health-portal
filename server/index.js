@@ -299,8 +299,8 @@ function aggregateRecord(stats, record) {
   const numValue = parseFloat(value);
   if (!stats.metricsByType[type]) {
     stats.metricsByType[type] = {
-      values: [],
-      dates: [],
+      dailyAgg: {},   // dateKey -> { sum, count, min, max }
+      values: [],     // built from dailyAgg in finalizeStats
       count: 0,
       sum: 0,
       min: Infinity,
@@ -317,11 +317,17 @@ function aggregateRecord(stats, record) {
     metric.sum += numValue;
     if (numValue < metric.min) metric.min = numValue;
     if (numValue > metric.max) metric.max = numValue;
-    // Sample: keep every Nth value to limit array size (~2000 per metric max)
-    if (metric.values.length < 2000 && (metric.count <= 100 || metric.count % Math.max(1, Math.floor(metric.count / 2000)) === 0)) {
-      const ts = dateKey ? new Date(dateKey).getTime() : null;
-      metric.values.push({ date: dateKey, value: numValue, timestamp: ts });
-      metric.dates.push(dateKey);
+
+    // Aggregate by day instead of sampling raw values
+    if (dateKey) {
+      if (!metric.dailyAgg[dateKey]) {
+        metric.dailyAgg[dateKey] = { sum: 0, count: 0, min: Infinity, max: -Infinity };
+      }
+      const day = metric.dailyAgg[dateKey];
+      day.sum += numValue;
+      day.count += 1;
+      if (numValue < day.min) day.min = numValue;
+      if (numValue > day.max) day.max = numValue;
     }
   }
 }
@@ -342,12 +348,29 @@ function finalizeStats(stats) {
   stats.allDates = Array.from(stats.allDatesSet).sort();
   delete stats.allDatesSet;
 
-  // Fix Infinity values in metrics
+  // Fix Infinity values in metrics and build daily values arrays
   for (const metric of Object.values(stats.metricsByType)) {
     if (metric.min === Infinity) metric.min = 0;
     if (metric.max === -Infinity) metric.max = 0;
     if (metric.count > 0) {
       metric.avg = +(metric.sum / metric.count).toFixed(2);
+    }
+
+    // Build values array from daily aggregation
+    if (metric.dailyAgg) {
+      const sortedDays = Object.keys(metric.dailyAgg).sort();
+      metric.values = sortedDays.map(dateKey => {
+        const day = metric.dailyAgg[dateKey];
+        return {
+          date: dateKey,
+          value: +(day.sum / day.count).toFixed(2),  // daily average
+          min: +(day.min).toFixed(2),
+          max: +(day.max).toFixed(2),
+          count: day.count,
+          timestamp: new Date(dateKey).getTime()
+        };
+      });
+      delete metric.dailyAgg;  // free memory
     }
   }
 
@@ -656,9 +679,10 @@ function parseHealthXml(stream, stats, target) {
       }
     });
 
-    parser.on('closetag', (name) => {
+    parser.on('closetag', (tag) => {
+      const tagName = typeof tag === 'object' ? tag.name : tag;
       // Finalize workout when </Workout> closes — this ensures WorkoutStatistics data is captured
-      if (name === 'Workout' && currentWorkout) {
+      if (tagName === 'Workout' && currentWorkout) {
         aggregateWorkout(stats, currentWorkout);
         if (stats.workouts.length < LIMITS.MAX_WORKOUTS) {
           stats.workouts.push(currentWorkout);
@@ -668,7 +692,7 @@ function parseHealthXml(stream, stats, target) {
         currentWorkout = null;
       }
 
-      if (name === 'Electrocardiogram' && currentEcg) {
+      if (tagName === 'Electrocardiogram' && currentEcg) {
         if (stats.ecgs.length < LIMITS.MAX_ECGS) {
           stats.ecgs.push(currentEcg);
         }
@@ -886,8 +910,9 @@ function parseRouteFile(stream, stats, filename) {
       if (currentTag === 'speed') point.speed = text;
     });
 
-    parser.on('closetag', (name) => {
-      if (name === currentTag) currentTag = null;
+    parser.on('closetag', (tag) => {
+      const tagName = typeof tag === 'object' ? tag.name : tag;
+      if (tagName === currentTag) currentTag = null;
     });
 
     stream.on('data', (chunk) => {

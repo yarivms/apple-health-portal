@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LineChart,
   Line,
@@ -13,12 +13,10 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { format } from 'date-fns';
 import './ChartsSection.css';
 
 function ChartsSection({ data }) {
-  const { metricsByType, allDates } = data;
-  const [selectedMetrics, setSelectedMetrics] = useState(['HeartRate', 'StepCount']);
+  const { metricsByType } = data;
   const [timeRange, setTimeRange] = useState('month');
 
   // Get available metrics that have data
@@ -26,18 +24,28 @@ function ChartsSection({ data }) {
     ? Object.keys(metricsByType).filter(type => metricsByType[type].count > 0)
     : [];
 
-  // Build chart data from allDates and metricsByType
+  // Map short names to full metric keys for initial defaults
+  const resolveMetricName = (shortName) => {
+    return availableMetrics.find(k => k.toLowerCase().includes(shortName.toLowerCase())) || shortName;
+  };
+
+  const [selectedMetrics, setSelectedMetrics] = useState([]);
+
+  // Initialize selected metrics when data loads
+  useEffect(() => {
+    if (availableMetrics.length > 0 && selectedMetrics.length === 0) {
+      const defaults = ['HeartRate', 'StepCount'].map(resolveMetricName).filter(m => availableMetrics.includes(m));
+      setSelectedMetrics(defaults.length > 0 ? defaults : availableMetrics.slice(0, 2));
+    }
+  }, [availableMetrics.length]);
+
+  // Build chart data from metric values directly (daily aggregates)
   const buildChartData = () => {
-    if (!allDates || !metricsByType) return [];
+    if (!metricsByType) return [];
 
     const chartData = {};
-    
-    // Initialize all dates
-    allDates.forEach(dateStr => {
-      chartData[dateStr] = { date: dateStr };
-    });
 
-    // Fill in data for selected metrics
+    // Collect data from selected metrics
     selectedMetrics.forEach(metricName => {
       const metrics = Object.entries(metricsByType).find(([key]) => 
         key.toLowerCase().includes(metricName.toLowerCase())
@@ -46,14 +54,25 @@ function ChartsSection({ data }) {
       if (metrics) {
         const [metricType, metricData] = metrics;
         metricData.values?.forEach(val => {
-          if (chartData[val.date]) {
-            chartData[val.date][metricName] = parseFloat(val.value);
+          if (!chartData[val.date]) {
+            chartData[val.date] = { date: val.date };
           }
+          chartData[val.date][metricName] = parseFloat(val.value);
         });
       }
     });
 
-    return Object.values(chartData).slice(-Math.min(30, allDates.length));
+    // Sort by date and apply time range filter
+    let sorted = Object.values(chartData).sort((a, b) => a.date.localeCompare(b.date));
+    
+    if (timeRange === 'week') {
+      sorted = sorted.slice(-7);
+    } else if (timeRange === 'month') {
+      sorted = sorted.slice(-30);
+    }
+    // 'all' returns everything
+
+    return sorted;
   };
 
   const chartData = buildChartData();
@@ -72,6 +91,8 @@ function ChartsSection({ data }) {
     const key = Object.keys(colors).find(k => metric.toLowerCase().includes(k.toLowerCase()));
     return colors[key] || colors.default;
   };
+
+  const shortName = (metric) => metric.replace(/HKQuantityTypeIdentifier/g, '').replace(/HKCategoryTypeIdentifier/g, '');
 
   return (
     <div className="charts-section">
@@ -107,9 +128,7 @@ function ChartsSection({ data }) {
                   <label key={metric} className="checkbox-label">
                     <input
                       type="checkbox"
-                      checked={selectedMetrics.some(m => 
-                        m.toLowerCase() === metric.toLowerCase()
-                      )}
+                      checked={selectedMetrics.includes(metric)}
                       onChange={(e) => {
                         if (e.target.checked) {
                           setSelectedMetrics([...selectedMetrics, metric]);
@@ -160,6 +179,7 @@ function ChartsSection({ data }) {
                         key={metric}
                         type="monotone"
                         dataKey={metric}
+                        name={shortName(metric)}
                         stroke={getColor(metric)}
                         connectNulls
                         strokeWidth={2}
@@ -175,7 +195,7 @@ function ChartsSection({ data }) {
             {/* Individual charts for first few metrics */}
             {selectedMetrics.slice(0, 3).map((metric) => (
               <div key={metric} className="chart-container">
-                <h3>{metric.replace(/HKQuantityTypeIdentifier/g, '')}</h3>
+                <h3>{shortName(metric)}</h3>
                 <ResponsiveContainer width="100%" height={250}>
                   <AreaChart data={chartData}>
                     <defs>
