@@ -81,24 +81,25 @@ app.post('/api/parse', (req, res) => {
       }
     });
 
-    file.on('end', () => {
+    file.on('end', async () => {
       console.log(`[UPLOAD] Upload complete: ${(totalBytes / 1024 / 1024).toFixed(1)} MB`);
       const buffer = Buffer.concat(chunks);
       console.log('[API] Starting ZIP parse from buffer...');
       
-      // Parse from buffer
-      const bufferStream = Readable.from(buffer);
-      
-      parseZipStream(bufferStream, stats)
-        .then(() => {
-          finalizeStats(stats);
-          console.log(`[API] Parse complete: ${stats.totalRecords} records, ${stats.totalWorkouts} workouts`);
-          sendOnce(200, stats);
-        })
-        .catch((err) => {
-          console.error('[API] Parse error:', err.message);
-          sendOnce(400, { error: err.message || 'Failed to parse ZIP' });
-        });
+      try {
+        // Open ZIP from buffer
+        const directory = await unzipper.Open.buffer(buffer);
+        console.log(`[ZIP] Opened ZIP, found ${directory.files.length} files`);
+        
+        await parseZipFromDirectory(directory, stats);
+        
+        finalizeStats(stats);
+        console.log(`[API] Parse complete: ${stats.totalRecords} records, ${stats.totalWorkouts} workouts`);
+        sendOnce(200, stats);
+      } catch (err) {
+        console.error('[API] Parse error:', err.message);
+        sendOnce(400, { error: err.message || 'Failed to parse ZIP' });
+      }
     });
 
     file.on('error', (err) => {
@@ -151,6 +152,48 @@ function createStats() {
 function finalizeStats(stats) {
   stats.totalECGs = stats.ecgs.length;
   stats.totalRoutes = stats.workoutRoutes.length;
+}
+
+async function parseZipFromDirectory(directory, stats) {
+  console.log(`[ZIP] Opened ZIP, found ${directory.files.length} files`);
+  const tasks = [];
+  const allPaths = [];
+  
+  for (const file of directory.files) {
+    if (file.type !== 'File') continue;
+    const path = file.path || '';
+    allPaths.push(path);
+    
+    if (isZip(path)) {
+      // Buffer nested ZIP and recursively parse
+      console.log(`[ZIP] Nested ZIP detected: ${path}`);
+      tasks.push(
+        file.buffer()
+          .then(buf => unzipper.Open.buffer(buf))
+          .then(dir => parseZipFromDirectory(dir, stats))
+      );
+    } else if (isExportXml(path)) {
+      console.log(`[ZIP] Found export XML: ${path}`);
+      tasks.push(parseHealthXml(file.stream(), stats, 'main'));
+    } else if (isCdaXml(path)) {
+      console.log(`[ZIP] Found clinical XML: ${path}`);
+      tasks.push(parseHealthXml(file.stream(), stats, 'clinical'));
+    } else if (isEcgXml(path)) {
+      console.log(`[ZIP] Found ECG XML: ${path}`);
+      tasks.push(parseEcgXml(file.stream(), stats, path));
+    } else if (isRouteFile(path)) {
+      console.log(`[ZIP] Found route file: ${path}`);
+      tasks.push(parseRouteFile(file.stream(), stats, path));
+    }
+  }
+  
+  // Debug: log all files that don't match any pattern
+  console.log(`[ZIP] All ${allPaths.length} files in ZIP:`);
+  for (const p of allPaths.slice(0, 50)) {
+    console.log(`  - ${p}`);
+  }
+  
+  await Promise.all(tasks);
 }
 
 function parseZipStream(stream, stats) {
