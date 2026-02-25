@@ -79,6 +79,7 @@ export default function ApiSettings() {
           {status === 'error' && url && (
             <p className="panel-warn">
               ⚠ Cannot reach <strong>{url}/health</strong>. Make sure the server is running.
+              Upload will fall back to client-side parsing.
             </p>
           )}
           {status === 'ok' && (

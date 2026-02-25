@@ -25,39 +25,54 @@ export default function FileUploader({ onDataLoaded }) {
     try {
       let aggregatedData;
 
-      if (apiBaseUrl) {
-        const formData = new FormData();
-        formData.append('file', file);
+      let useServer = !!apiBaseUrl;
 
-        setProgress('Uploading to server...');
-        const response = await axios.post(`${apiBaseUrl.replace(/\/$/, '')}/api/parse`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          timeout: 600000, // 10 minutes
-          maxContentLength: Infinity,
-          maxBodyLength: Infinity,
-          onUploadProgress: (event) => {
-            if (!event.total) return;
-            const percent = Math.round((event.loaded / event.total) * 100);
-            const mbLoaded = (event.loaded / 1024 / 1024).toFixed(1);
-            const mbTotal = (event.total / 1024 / 1024).toFixed(1);
-            setProgress(`Uploading to server... ${percent}% (${mbLoaded}/${mbTotal} MB)`);
-            if (percent === 100) {
-              setProgress('Processing ZIP file on server... (this may take a few minutes for large files)');
+      if (useServer) {
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+
+          setProgress('Uploading to server...');
+          const response = await axios.post(`${apiBaseUrl.replace(/\/$/, '')}/api/parse`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 600000, // 10 minutes
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+            onUploadProgress: (event) => {
+              if (!event.total) return;
+              const percent = Math.round((event.loaded / event.total) * 100);
+              const mbLoaded = (event.loaded / 1024 / 1024).toFixed(1);
+              const mbTotal = (event.total / 1024 / 1024).toFixed(1);
+              setProgress(`Uploading to server... ${percent}% (${mbLoaded}/${mbTotal} MB)`);
+              if (percent === 100) {
+                setProgress('Processing ZIP file on server... (this may take a few minutes for large files)');
+              }
             }
-          }
-        });
+          });
 
-        const serverData = response.data || {};
-        aggregatedData = {
-          ...serverData,
-          fileSize: file.size,
-          uploadDate: new Date().toISOString(),
-          originalFileSize: serverData.originalFileSize || null,
-          tooLarge: false,
-          cdaTooLarge: false,
-          warnings: serverData.warnings || []
-        };
-      } else {
+          const serverData = response.data || {};
+          aggregatedData = {
+            ...serverData,
+            fileSize: file.size,
+            uploadDate: new Date().toISOString(),
+            originalFileSize: serverData.originalFileSize || null,
+            tooLarge: false,
+            cdaTooLarge: false,
+            warnings: serverData.warnings || []
+          };
+        } catch (serverErr) {
+          // Network error (server unreachable) — fall back to client-side parsing
+          const isNetworkError = !serverErr.response; // no response = network/DNS/CORS issue
+          if (isNetworkError) {
+            console.warn('Server unreachable, falling back to client-side parsing:', serverErr.message);
+            useServer = false;
+          } else {
+            throw serverErr; // real server error — bubble up
+          }
+        }
+      }
+
+      if (!useServer && !aggregatedData) {
         // Parse ZIP in the browser
         setProgress('Extracting health data...');
         const healthData = await parseAppleHealthZip(file);
