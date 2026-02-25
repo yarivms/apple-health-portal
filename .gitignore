@@ -3,3 +3,4 @@ server/node_modules/
 node_modules/.vite/
 .env
 server/zip-file-listing.txt
+server/certs/

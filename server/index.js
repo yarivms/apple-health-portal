@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import fs from 'fs';
+import https from 'https';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -260,8 +262,29 @@ Guidelines:
 });
 
 app.listen(PORT, () => {
-  console.log(`Server listening on ${PORT}`);
+  console.log(`HTTP server listening on ${PORT}`);
 });
+
+// HTTPS server for GitHub Pages (HTTPS → localhost)
+const HTTPS_PORT = process.env.HTTPS_PORT || 8443;
+const certPath = path.resolve(__dirname, 'certs', 'localhost-cert.pem');
+const keyPath = path.resolve(__dirname, 'certs', 'localhost-key.pem');
+
+if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+  const httpsOptions = {
+    key: fs.readFileSync(keyPath),
+    cert: fs.readFileSync(certPath),
+  };
+  https.createServer(httpsOptions, app).listen(HTTPS_PORT, () => {
+    console.log(`HTTPS server listening on ${HTTPS_PORT}`);
+    console.log(`  → Use https://localhost:${HTTPS_PORT} from GitHub Pages`);
+    console.log(`  → You must trust the self-signed cert once in your browser:`);
+    console.log(`    Open https://localhost:${HTTPS_PORT}/health and accept the warning`);
+  });
+} else {
+  console.log('No TLS certs found in server/certs/ — HTTPS disabled.');
+  console.log('Run: openssl req -x509 -newkey rsa:2048 -keyout server/certs/localhost-key.pem -out server/certs/localhost-cert.pem -days 365 -nodes -subj "/CN=localhost"');
+}
 
 function createStats() {
   return {
